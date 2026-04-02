@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd">
+
+<!--
+    Web Performance Automation - TestNG Suite
+    Run: mvn test   (or right-click → Run in IntelliJ)
+-->
+<suite name="Web Performance Benchmark Suite" verbose="2" thread-count="1">
+
+    <listeners>
+        <listener class-name="org.testng.reporters.EmailableReporter2"/>
+    </listeners>
+
+    <test name="Full Application Performance Tests">
+        <classes>
+            <class name="com.perforce.performance.tests.WebPerformanceTest">
+                <methods>
+                    <!-- Run in this exact order -->
+                    <include name="testLoginPagePerformance"/>
+                    <include name="testFullAppFlowPerformance"/>
+                    <include name="testPerformanceBenchmarkMultiRun"/>
+                </methods>
+            </class>
+        </classes>
+    </test>
+
+    <!--
+        Page Load Analyzer Agent — set target.url to any URL you want to analyze.
+        Can also be overridden at runtime: mvn test -Dtest=PageLoadAnalyzerTest -Dtarget.url=https://example.com
+    -->
+    <test name="Page Load Analyzer">
+        <parameter name="target.url" value=""/>
+        <classes>
+            <class name="com.perforce.performance.tests.PageLoadAnalyzerTest"/>
+        </classes>
+    </test>
+
+</suite>
