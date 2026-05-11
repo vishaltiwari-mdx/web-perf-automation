@@ -1,0 +1,30 @@
+[    3963ms] [INFO] You are running a development build of vue-i18n.
+Make sure to use the production build (*.prod.js) when deploying for production. @ http://vishal.mdx.perforce.com:3000/vue-dist/js/b9a4b4fcce8268745e80.js:1
+[    6436ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://vishal.mdx.perforce.com:3000/public/v2/external-auth-config:0
+[    6710ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://vishal.mdx.perforce.com:3000/public/v2/users/whoami?include=groups:0
+[    6711ms] [LOG] AxiosError: Request failed with status code 401
+    at Le (http://vishal.mdx.perforce.com:3000/vue-dist/js/b9a4b4fcce8268745e80.js:2:5691528)
+    at XMLHttpRequest.m (http://vishal.mdx.perforce.com:3000/vue-dist/js/b9a4b4fcce8268745e80.js:2:5696039)
+    at ut.request (http://vishal.mdx.perforce.com:3000/vue-dist/js/b9a4b4fcce8268745e80.js:2:5704749)
+    at async r.request (http://vishal.mdx.perforce.com:3000/vue-dist/js/b9a4b4fcce8268745e80.js:2:88988) @ http://vishal.mdx.perforce.com:3000/vue-dist/js/5809.521f7182a440aaf89adc.chunk.js:1
+[   28207ms] [WARNING] [intlify] Not found parent scope. use the global scope. @ http://vishal.mdx.perforce.com:3000/vue-dist/js/b9a4b4fcce8268745e80.js:1
+[   92520ms] [ERROR] **************************************************************************************************************************** @ http://vishal.mdx.perforce.com:3000/vue-dist/js/b9a4b4fcce8268745e80.js:1
+[   92520ms] [ERROR] ************************************************ AG Grid Enterprise License ************************************************ @ http://vishal.mdx.perforce.com:3000/vue-dist/js/b9a4b4fcce8268745e80.js:1
+[   92520ms] [ERROR] *************************************************** Invalid License Key **************************************************** @ http://vishal.mdx.perforce.com:3000/vue-dist/js/b9a4b4fcce8268745e80.js:1
+[   92521ms] [ERROR] * Your license key is not valid.                                                                                           * @ http://vishal.mdx.perforce.com:3000/vue-dist/js/b9a4b4fcce8268745e80.js:1
+[   92521ms] [ERROR] * To troubleshoot your license key visit https://www.ag-grid.com/licensing/.                                               * @ http://vishal.mdx.perforce.com:3000/vue-dist/js/b9a4b4fcce8268745e80.js:1
+[   92521ms] [ERROR] **************************************************************************************************************************** @ http://vishal.mdx.perforce.com:3000/vue-dist/js/b9a4b4fcce8268745e80.js:1
+[   92521ms] [ERROR] **************************************************************************************************************************** @ http://vishal.mdx.perforce.com:3000/vue-dist/js/b9a4b4fcce8268745e80.js:1
+[   92577ms] [WARNING] AG Grid: invalid colDef property 'propertyType' did you mean any of these: cellDataType, headerStyle, type, chartDataType, wrapHeaderText, rowGroup, rowDragText, cellRenderer.
+If you are trying to annotate colDef with application data, use the 'colDef.context' property instead. @ http://vishal.mdx.perforce.com:3000/vue-dist/js/b9a4b4fcce8268745e80.js:1
+[   92578ms] [WARNING] AG Grid: invalid colDef property 'propertyId' did you mean any of these: groupId, rowGroup, headerStyle, comparator, rowGroupIndex, openByDefault, sortIndex, rowDragText.
+If you are trying to annotate colDef with application data, use the 'colDef.context' property instead. @ http://vishal.mdx.perforce.com:3000/vue-dist/js/b9a4b4fcce8268745e80.js:1
+[   92578ms] [WARNING] AG Grid: to see all the valid colDef properties please check: https://www.ag-grid.com/vue-data-grid/column-properties/ @ http://vishal.mdx.perforce.com:3000/vue-dist/js/b9a4b4fcce8268745e80.js:1
+[   92631ms] [WARNING] [intlify] Not found parent scope. use the global scope. @ http://vishal.mdx.perforce.com:3000/vue-dist/js/b9a4b4fcce8268745e80.js:1
+[ 4919409ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://vishal.mdx.perforce.com:3000/public/v2/external-auth-config:0
+[ 4919678ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://vishal.mdx.perforce.com:3000/public/v2/users/whoami?include=groups:0
+[ 4919679ms] [LOG] AxiosError: Request failed with status code 401
+    at Le (http://vishal.mdx.perforce.com:3000/vue-dist/js/b9a4b4fcce8268745e80.js:2:5691528)
+    at XMLHttpRequest.m (http://vishal.mdx.perforce.com:3000/vue-dist/js/b9a4b4fcce8268745e80.js:2:5696039)
+    at ut.request (http://vishal.mdx.perforce.com:3000/vue-dist/js/b9a4b4fcce8268745e80.js:2:5704749)
+    at async r.request (http://vishal.mdx.perforce.com:3000/vue-dist/js/b9a4b4fcce8268745e80.js:2:88988) @ http://vishal.mdx.perforce.com:3000/vue-dist/js/5809.521f7182a440aaf89adc.chunk.js:1

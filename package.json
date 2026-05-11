@@ -1,0 +1,37 @@
+{
+  "name": "web-perf-automation",
+  "version": "1.0.0",
+  "description": "Web performance automation framework — TypeScript / Playwright",
+  "scripts": {
+    "test": "playwright test",
+    "test:full": "playwright test --project=full-suite",
+    "test:helix": "playwright test --project=helix-pages",
+    "test:analyze": "playwright test --project=analyzer",
+    "analyze": "ts-node src/agent/PageLoadAnalyzerRunner.ts",
+    "mcp": "ts-node mcp-server.ts",
+    "typecheck": "tsc --noEmit",
+    "allure:generate": "allure generate reports/allure-results --clean -o reports/allure-report",
+    "allure:serve": "allure serve reports/allure-results",
+    "report": "playwright show-report",
+    "start": "ts-node server.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.90.0",
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "chrome-launcher": "^1.2.1",
+    "exceljs": "^4.4.0",
+    "express": "^5.2.1",
+    "lighthouse": "^12.8.2",
+    "properties-reader": "^2.3.0",
+    "winston": "^3.11.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.44.0",
+    "@types/express": "^5.0.6",
+    "@types/node": "^20.0.0",
+    "@types/properties-reader": "^2.1.3",
+    "pptxgenjs": "^4.0.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.0"
+  }
+}

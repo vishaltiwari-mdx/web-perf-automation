@@ -1,0 +1,8 @@
+- alert [ref=e3]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]: 
+      - generic [ref=e7]: Error
+    - button "Close" [ref=e8] [cursor=pointer]:
+      - generic [ref=e9]: 
+  - generic [ref=e10]: Request failed with status code 404

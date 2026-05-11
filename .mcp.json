@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "web-perf-automation": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["ts-node", "--project", "tsconfig.json", "mcp-server.ts"]
+    },
+    "playwright": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"]
+    }
+  }
+}

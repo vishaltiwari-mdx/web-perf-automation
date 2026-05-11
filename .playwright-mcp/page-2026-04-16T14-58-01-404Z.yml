@@ -1,0 +1,17 @@
+- generic [ref=e17]:
+  - img "Perforce IPLM v2026.2.0 (τ)" [ref=e18]
+  - generic [ref=e20]:
+    - generic [ref=e22]:
+      - img [ref=e24]
+      - textbox "Enter username" [ref=e27]: admin
+    - generic [ref=e30]:
+      - img [ref=e32]
+      - textbox "Enter password" [ref=e35]: admin
+    - button "Log in" [ref=e37] [cursor=pointer]
+  - generic [ref=e38]:
+    - link "Product documentation" [ref=e40] [cursor=pointer]:
+      - /url: https://help.perforce.com/helix-iplm/public-latest/latest/Default.htm?cshid=Methodics_IPLM
+    - generic [ref=e41]: Web UI v2026.2.0; API v2025.4.0 +
+    - generic [ref=e42]:
+      - generic [ref=e43]: 
+      - text: 2026 Perforce Software, Inc. All rights reserved.

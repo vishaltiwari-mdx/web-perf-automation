@@ -1,0 +1,1587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Web Performance Analyzer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #f0f4f8;
+      --surface:  #ffffff;
+      --surface2: #f1f5f9;
+      --surface3: #e2e8f0;
+      --border:   rgba(15,23,42,0.11);
+      --border2:  rgba(15,23,42,0.06);
+      --text:     #0f172a;
+      --muted:    #64748b;
+      --accent:   #2563eb;
+      --accent2:  #7c3aed;
+      --green:    #16a34a;
+      --yellow:   #d97706;
+      --red:      #dc2626;
+      --cyan:     #0891b2;
+      --radius:   12px;
+      --radius-lg:18px;
+    }
+
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh; line-height: 1.6; overflow-x: hidden;
+    }
+    /* Professional light background */
+    body::before {
+      content: ''; position: fixed; inset: 0; z-index: 0;
+      background:
+        radial-gradient(ellipse 70% 50% at 5%  0%,   rgba(37,99,235,0.07)  0%, transparent 55%),
+        radial-gradient(ellipse 55% 45% at 95% 100%,  rgba(124,58,237,0.06) 0%, transparent 55%),
+        radial-gradient(ellipse 90% 70% at 50% 50%,   rgba(248,250,252,0.7) 0%, transparent 100%);
+      pointer-events: none;
+    }
+    body::after {
+      content: ''; position: fixed; inset: 0; z-index: 0;
+      background-image:
+        linear-gradient(rgba(15,23,42,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(15,23,42,0.03) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+    }
+
+    .wrapper {
+      position: relative; z-index: 1;
+      max-width: 1100px; margin: 0 auto; padding: 32px 24px 80px;
+    }
+
+    /* ── Top accent bar ── */
+    body > .wrapper::before {
+      content: ''; display: block; height: 3px; margin: -32px -24px 32px;
+      background: linear-gradient(90deg, var(--accent) 0%, var(--accent2) 60%, transparent 100%);
+      border-radius: 0 0 4px 4px;
+    }
+
+    /* ── Hero ── */
+    .hero { text-align: center; padding: 48px 0 40px; }
+    .hero__badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(37,99,235,0.08); border: 1px solid rgba(37,99,235,0.2);
+      border-radius: 100px; padding: 6px 16px; font-size: 0.78rem;
+      letter-spacing: 0.08em; color: var(--accent); text-transform: uppercase; margin-bottom: 20px;
+    }
+    .hero__badge .dot {
+      width: 7px; height: 7px; border-radius: 50%; background: var(--accent);
+      box-shadow: 0 0 8px var(--accent); animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+    .hero h1 {
+      font-size: clamp(2rem,4vw,3rem); font-weight: 800;
+      background: linear-gradient(135deg,#0f172a 0%,var(--accent) 55%,var(--accent2) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text; letter-spacing: -0.02em; margin-bottom: 12px;
+    }
+    .hero p { color: var(--muted); font-size: 1.05rem; max-width: 560px; margin: 0 auto; }
+
+    /* ── Card ── */
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 28px 32px; margin-bottom: 20px;
+      box-shadow: 0 1px 4px rgba(15,23,42,.06), 0 4px 16px rgba(15,23,42,.06);
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .card:hover { border-color: rgba(37,99,235,.3); box-shadow: 0 2px 8px rgba(15,23,42,.08), 0 8px 24px rgba(37,99,235,.08); }
+    .card__title {
+      font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em;
+      text-transform: uppercase; color: var(--accent); margin-bottom: 18px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .card__title::after { content:''; flex:1; height:1px; background:var(--border2); }
+
+    /* ── Form ── */
+    label { display:block; font-size:.82rem; font-weight:600; color:var(--muted); margin-bottom:6px; }
+    input[type="url"], textarea {
+      width:100%; background:var(--surface2); border:1px solid var(--border);
+      border-radius:var(--radius); color:var(--text); font-size:.92rem; padding:10px 14px;
+      outline:none; transition:border-color .2s,box-shadow .2s; font-family:inherit;
+    }
+    input[type="url"]:focus, textarea:focus {
+      border-color:var(--accent); box-shadow:0 0 0 3px rgba(37,99,235,.12);
+    }
+    textarea { resize:vertical; min-height:90px; line-height:1.5; }
+
+    /* ── URL list ── */
+    #url-list { display:flex; flex-direction:column; gap:10px; margin-bottom:12px; }
+    .url-row { display:flex; gap:8px; align-items:center; animation:fadeIn .25s ease; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:none} }
+    .url-row input { flex:1; }
+    .btn-icon {
+      background:transparent; border:1px solid var(--border); color:var(--muted);
+      border-radius:8px; width:36px; height:36px; cursor:pointer; font-size:1rem;
+      display:flex; align-items:center; justify-content:center;
+      transition:background .15s,color .15s,border-color .15s; flex-shrink:0;
+    }
+    .btn-icon:hover { background:rgba(220,38,38,.12); border-color:var(--red); color:var(--red); }
+    .btn-add {
+      background:rgba(37,99,235,.08); border:1px dashed rgba(37,99,235,.3);
+      color:var(--accent); border-radius:var(--radius); padding:9px 18px;
+      font-size:.85rem; font-weight:600; cursor:pointer; width:100%; text-align:center;
+      transition:background .15s,border-color .15s;
+    }
+    .btn-add:hover { background:rgba(37,99,235,.14); border-color:rgba(37,99,235,.5); }
+
+    /* ── Metrics type ── */
+    .metrics-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:4px; }
+    .metric-card { position:relative; cursor:pointer; }
+    .metric-card input[type="radio"] { position:absolute; opacity:0; width:0; height:0; }
+    .metric-card__inner {
+      border:1.5px solid var(--border); border-radius:var(--radius); padding:16px 14px;
+      text-align:center; transition:border-color .2s,background .2s,box-shadow .2s; background:var(--surface2);
+    }
+    .metric-card input:checked + .metric-card__inner {
+      border-color:var(--accent); background:rgba(37,99,235,.1); box-shadow:0 0 0 3px rgba(37,99,235,.1);
+    }
+    .metric-card__icon { font-size:1.6rem; margin-bottom:8px; display:block; }
+    .metric-card__name { font-size:.85rem; font-weight:700; color:var(--text); display:block; margin-bottom:4px; }
+    .metric-card__desc { font-size:.72rem; color:var(--muted); line-height:1.4; }
+    .metric-pill {
+      display:inline-block; background:rgba(37,99,235,.07); border:1px solid rgba(37,99,235,.15);
+      border-radius:6px; padding:4px 10px; font-size:.75rem; color:var(--muted); font-weight:500; white-space:nowrap;
+    }
+
+    /* ── Flow preview ── */
+    #flow-preview-section { display:none; margin-bottom:20px; }
+    .flow-preview-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); overflow: hidden;
+      box-shadow: 0 1px 4px rgba(15,23,42,.06), 0 4px 16px rgba(15,23,42,.06);
+    }
+    .flow-preview-header {
+      padding: 16px 24px; background: var(--surface2); border-bottom: 1px solid var(--border2);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .flow-preview-header__title { font-size:.85rem; font-weight:700; color:var(--accent); }
+    .flow-preview-header__sub { font-size:.75rem; color:var(--muted); margin-left:auto; }
+    .flow-preview-body { padding: 20px 24px; }
+    .preview-url-block { margin-bottom: 24px; }
+    .preview-url-block:last-child { margin-bottom: 0; }
+    .preview-url-header {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+      padding-bottom: 10px; border-bottom: 1px solid var(--border2);
+    }
+    .preview-url-num {
+      width: 26px; height: 26px; border-radius: 50%; background: rgba(37,99,235,.15);
+      border: 1px solid rgba(37,99,235,.3); color: var(--accent); font-size: .78rem;
+      font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .preview-url-name { font-size:.88rem; font-weight:700; color:var(--text); }
+    .preview-url-full { font-size:.72rem; color:var(--muted); font-family:monospace; word-break:break-all; }
+    .preview-route-badge {
+      margin-left:auto; flex-shrink:0; font-size:.65rem; font-weight:700; padding:3px 10px;
+      border-radius:100px; text-transform:uppercase; letter-spacing:.06em;
+    }
+    .badge-found   { background:rgba(22,163,74,.1);   color:#166534; border:1px solid rgba(22,163,74,.3); }
+    .badge-dynamic { background:rgba(215,119,6,.1);   color:#92400e; border:1px solid rgba(215,119,6,.3); }
+    .badge-signin  { background:rgba(37,99,235,.1);   color:#1e40af; border:1px solid rgba(37,99,235,.25); }
+    .badge-missing { background:rgba(220,38,38,.1);   color:#991b1b; border:1px solid rgba(220,38,38,.3); }
+    .preview-steps { display:flex; flex-direction:column; gap:2px; padding-left:4px; }
+    .preview-step {
+      display:flex; align-items:flex-start; gap:10px; padding:5px 8px;
+      border-radius:8px; transition:background .15s; font-size:.82rem;
+    }
+    .preview-step:hover { background:rgba(37,99,235,.05); }
+    .step-num {
+      width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+      font-size:.68rem; font-weight:700; flex-shrink:0; margin-top:1px;
+    }
+    .step-nav     .step-num { background:rgba(37,99,235,.15); color:var(--accent); }
+    .step-login   .step-num { background:rgba(124,58,237,.15); color:var(--accent2); }
+    .step-wait    .step-num { background:rgba(8,145,178,.15); color:var(--cyan); }
+    .step-observe .step-num { background:rgba(215,119,6,.15); color:var(--yellow); }
+    .step-click   .step-num { background:rgba(22,163,74,.15); color:var(--green); }
+    .step-collect .step-num { background:rgba(37,99,235,.15); color:var(--accent); }
+    .step-lh      .step-num { background:rgba(215,119,6,.15); color:var(--yellow); }
+    .step-dynamic .step-num { background:rgba(215,119,6,.15); color:var(--yellow); }
+    .step-dynamic { cursor: default; }
+    .step-dynamic:not(.editing):not(.confirmed):hover { box-shadow: 0 0 0 1px rgba(215,119,6,.3); border-radius: 8px; }
+    .step-dynamic .step-define-section { display: none; }
+    .step-dynamic.editing .step-define-section,
+    .step-dynamic.confirmed .step-define-section { display: block; margin-top: 10px; }
+    .step-dynamic-hint { font-size: .68rem; color: var(--muted); font-style: italic; margin-top: 3px; }
+    .step-dynamic.confirmed .step-dynamic-hint { display: none; }
+    .step-dynamic.confirmed .step-num { background:rgba(22,163,74,.15); color:var(--green); }
+    .step-dynamic.confirmed .step-label { color: var(--green); }
+    .step-define-input[readonly] { opacity: .8; cursor: default; resize: none; background: rgba(22,163,74,.05); border-color: rgba(22,163,74,.3); }
+    .step-define-saved-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: .7rem; color: var(--green); font-weight: 700; margin-top: 6px;
+    }
+    .btn-ai-parse {
+      margin-top: 6px; padding: 4px 12px; font-size: .72rem; font-weight: 700;
+      border: 1px solid rgba(124,58,237,.35); border-radius: 6px; cursor: pointer;
+      background: rgba(124,58,237,.08); color: var(--accent2);
+      transition: background .15s, opacity .15s;
+    }
+    .btn-ai-parse:hover:not(:disabled) { background: rgba(124,58,237,.18); }
+    .btn-ai-parse:disabled { opacity: .45; cursor: default; }
+    .step-missing .step-num { background:rgba(220,38,38,.15); color:var(--red); }
+    .step-action  .step-num { background:rgba(22,163,74,.12); color:var(--green); border:1px solid rgba(22,163,74,.2); }
+    .step-body { flex:1; }
+    .step-label { font-weight:600; color:var(--text); }
+    .step-detail { font-size:.75rem; color:var(--muted); margin-top:2px; font-family:monospace; }
+    .step-action-row {
+      display:flex; align-items:center; gap:8px; padding:4px 8px;
+      background:rgba(22,163,74,.05); border:1px solid rgba(22,163,74,.12); border-radius:6px; margin-top:3px;
+    }
+    .step-arrow { color:var(--green); font-size:.75rem; flex-shrink:0; }
+    .step-selector { font-family:monospace; font-size:.73rem; color:var(--cyan); }
+    .step-sel-label { font-size:.73rem; color:var(--muted); }
+
+    /* ── Inline flow editor (embedded in plan card) ── */
+    .flow-inline-editor {
+      padding: 14px 24px 16px; border-top: 1px solid var(--border2);
+      background: rgba(37,99,235,.02);
+    }
+    .flow-inline-label {
+      display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;
+    }
+    .flow-inline-label span { font-size: .75rem; color: var(--muted); font-weight: 600; }
+    .btn-browse-sm {
+      background: rgba(124,58,237,.1); border: 1px solid rgba(124,58,237,.25);
+      color: var(--accent2); border-radius: 6px; padding: 3px 10px;
+      font-size: .72rem; font-weight: 600; cursor: pointer; transition: background .15s;
+    }
+    .btn-browse-sm:hover { background: rgba(124,58,237,.2); }
+
+    /* ── Flow action bar (confirm only) ── */
+    .flow-action-bar {
+      padding: 14px 24px; border-top: 1px solid var(--border2);
+      display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    }
+    .flow-action-question {
+      display: flex; align-items: center; gap: 8px; font-size: .85rem; font-weight: 600;
+      color: var(--muted); flex: 1;
+    }
+    .flow-action-question .q-icon { font-size: 1rem; }
+    .btn-confirm-yes {
+      background: rgba(22,163,74,.1); border: 1px solid rgba(22,163,74,.35);
+      color: #166534; border-radius: 8px; padding: 8px 20px; font-size: .84rem;
+      font-weight: 700; cursor: pointer; transition: background .15s, opacity .2s;
+    }
+    .btn-confirm-yes:hover:not(:disabled) { background: rgba(22,163,74,.18); }
+    .btn-confirm-yes:disabled {
+      opacity: .4; cursor: not-allowed;
+      background: rgba(100,116,139,.06); border-color: rgba(100,116,139,.2); color: var(--muted);
+    }
+    .flow-confirm-hint {
+      font-size: .72rem; color: var(--muted); font-style: italic;
+    }
+    .flow-confirmed-bar {
+      padding: 14px 24px; border-top: 1px solid rgba(22,163,74,.2);
+      display: none; align-items: center; gap: 10px;
+      background: rgba(22,163,74,.05);
+    }
+    .flow-confirmed-bar.show { display: flex; }
+    .flow-confirmed-icon { font-size:1.1rem; }
+    .flow-confirmed-text { font-size:.85rem; font-weight:700; color:#166534; flex:1; }
+    .btn-change-flow {
+      background:none; border:none; color:var(--muted); font-size:.78rem;
+      cursor:pointer; text-decoration:underline; padding:0;
+    }
+    .btn-change-flow:hover { color:var(--accent); }
+
+    /* ── Removed: separate flow-edit-panel (now inline in plan card) ── */
+
+    /* ── Add-route inline notice ── */
+    .step-missing-row {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      padding: 8px 12px; background: rgba(220,38,38,.05);
+      border: 1px solid rgba(220,38,38,.2); border-radius: 8px; margin-top: 4px;
+    }
+    .step-missing-msg { font-size: .78rem; color: #991b1b; flex: 1; }
+    .btn-add-route {
+      background: rgba(215,119,6,.1); border: 1px solid rgba(215,119,6,.3);
+      color: #92400e; border-radius: 6px; padding: 4px 12px;
+      font-size: .75rem; font-weight: 700; cursor: pointer; white-space: nowrap;
+      transition: background .15s;
+    }
+    .btn-add-route:hover { background: rgba(215,119,6,.18); }
+    .btn-add-route:disabled { opacity: .5; cursor: default; }
+
+    /* ── Define-steps inline panel ── */
+    .step-define-section {
+      margin-top: 10px;
+      border: 1px solid rgba(8,145,178,.3);
+      border-radius: 8px;
+      padding: 10px 14px 8px;
+      background: rgba(8,145,178,.04);
+    }
+    .step-define-label {
+      font-size: .74rem; font-weight: 600; color: var(--cyan);
+      margin-bottom: 6px; display: flex; align-items: center; gap: 6px;
+    }
+    .step-define-input {
+      width: 100%; font-family: 'Consolas', 'Fira Code', monospace;
+      font-size: .78rem; padding: 8px 10px; resize: vertical;
+      border: 1px solid rgba(8,145,178,.25); border-radius: 6px;
+      background: rgba(8,145,178,.06); color: var(--text);
+      line-height: 1.55; outline: none;
+      transition: border-color .15s;
+    }
+    .step-define-input:focus { border-color: var(--cyan); }
+    .step-define-input::placeholder { color: var(--muted); opacity: .7; }
+    .step-define-status {
+      font-size: .72rem; margin-top: 5px; min-height: 16px;
+      display: flex; align-items: center; gap: 5px;
+    }
+
+    /* ── Routes modal ── */
+    #routes-modal {
+      display:none; position:fixed; inset:0; z-index:100;
+      background:rgba(0,0,0,.7); backdrop-filter:blur(4px);
+      align-items:center; justify-content:center;
+    }
+    #routes-modal.open { display:flex; }
+    .modal-box {
+      background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg);
+      padding:28px 32px; width:640px; max-width:95vw; max-height:80vh; overflow-y:auto;
+      box-shadow:0 20px 60px rgba(15,23,42,.18);
+    }
+    .modal-box h3 { font-size:1rem; font-weight:700; color:var(--accent); margin-bottom:16px; }
+    .route-item { background:var(--surface2); border:1px solid var(--border2); border-radius:var(--radius); padding:12px 16px; margin-bottom:10px; }
+    .route-item__pattern { font-family:monospace; font-size:.85rem; color:var(--cyan); font-weight:600; }
+    .route-item__desc { font-size:.82rem; color:var(--muted); margin-top:3px; }
+    .route-badge { display:inline-block; font-size:.65rem; font-weight:700; padding:2px 8px; border-radius:100px; text-transform:uppercase; letter-spacing:.06em; }
+    .badge-static  { background:rgba(22,163,74,.1); color:#166534; border:1px solid rgba(22,163,74,.3); }
+    .modal-close { background:none; border:none; color:var(--muted); font-size:1.3rem; cursor:pointer; float:right; line-height:1; }
+    .modal-close:hover { color:var(--red); }
+
+    /* ── Submit ── */
+    .btn-submit {
+      width:100%; padding:16px; font-size:1rem; font-weight:700; letter-spacing:.04em;
+      border:none; border-radius:var(--radius); cursor:pointer;
+      background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff;
+      box-shadow:0 4px 16px rgba(37,99,235,.28);
+      transition:opacity .2s,transform .1s,box-shadow .2s; position:relative; overflow:hidden;
+    }
+    .btn-submit:hover:not(:disabled) { opacity:.92; box-shadow:0 6px 24px rgba(37,99,235,.4); }
+    .btn-submit:active:not(:disabled) { transform:scale(.99); }
+    .btn-submit:disabled { opacity:.5; cursor:not-allowed; }
+    .btn-submit .spinner {
+      display:none; width:18px; height:18px; border:2px solid rgba(255,255,255,.3);
+      border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite;
+      margin-right:8px; vertical-align:middle;
+    }
+    .btn-submit.loading .spinner { display:inline-block; }
+    @keyframes spin { to{transform:rotate(360deg)} }
+
+    /* ── Progress ── */
+    #progress-section { display:none; }
+    .terminal {
+      background:#0f172a; border:1px solid rgba(15,23,42,.15); border-radius:var(--radius);
+      padding:16px 18px; font-family:'Cascadia Code','Fira Code','Courier New',monospace;
+      font-size:.80rem; line-height:1.7; max-height:340px; overflow-y:auto; color:#cbd5e1;
+    }
+    .terminal::-webkit-scrollbar { width:6px; }
+    .terminal::-webkit-scrollbar-thumb { background:#334155; border-radius:3px; }
+    .log-info  { color:#cbd5e1; }
+    .log-warn  { color:#fbbf24; }
+    .log-error { color:#f87171; }
+    .log-event { color:#38bdf8; font-weight:600; }
+    .log-done  { color:#4ade80; }
+    .progress-wrap { height:4px; background:rgba(15,23,42,.1); border-radius:2px; margin-bottom:20px; overflow:hidden; }
+    .progress-bar { height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2)); border-radius:2px; transition:width .4s ease; width:0%; }
+    #url-chips { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:20px; }
+    .chip { display:flex; align-items:center; gap:6px; background:var(--surface2); border:1px solid var(--border2); border-radius:100px; padding:5px 12px; font-size:.78rem; color:var(--muted); transition:border-color .2s,color .2s; }
+    .chip.running { border-color:var(--accent); color:var(--accent); }
+    .chip.done    { border-color:var(--green);  color:var(--green); }
+    .chip.error   { border-color:var(--red);    color:var(--red); }
+    .chip .chip-dot { width:7px; height:7px; border-radius:50%; background:currentColor; }
+    .chip.running .chip-dot { animation:pulse 1s ease-in-out infinite; }
+
+    /* ── Results ── */
+    #results-section { display:none; }
+    .results-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
+    .results-header h2 { font-size:1.2rem; font-weight:700; }
+    .btn-secondary {
+      background:rgba(37,99,235,.08); border:1px solid rgba(37,99,235,.25);
+      color:var(--accent); border-radius:8px; padding:7px 16px; font-size:.82rem;
+      font-weight:600; cursor:pointer; transition:background .15s; text-decoration:none; display:inline-block;
+    }
+    .btn-secondary:hover { background:rgba(37,99,235,.16); }
+    .result-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); overflow:hidden; margin-bottom:20px; box-shadow:0 1px 4px rgba(15,23,42,.06), 0 4px 16px rgba(15,23,42,.06); animation:fadeIn .3s ease; }
+    .result-card__header { padding:18px 24px; background:var(--surface2); border-bottom:1px solid var(--border2); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; }
+    .result-card__name { font-size:1rem; font-weight:700; color:var(--text); }
+    .result-card__url { font-size:.78rem; color:var(--muted); font-family:monospace; word-break:break-all; }
+    .status-badge { display:inline-block; padding:4px 14px; border-radius:100px; font-size:.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; }
+    .status-good     { background:rgba(22,163,74,.1);   color:#166534;  border:1px solid rgba(22,163,74,.3); }
+    .status-moderate { background:rgba(215,119,6,.1);   color:#92400e;  border:1px solid rgba(215,119,6,.3); }
+    .status-poor     { background:rgba(220,38,38,.1);   color:#991b1b;  border:1px solid rgba(220,38,38,.3); }
+    .status-na       { background:rgba(100,116,139,.1); color:var(--muted); border:1px solid rgba(100,116,139,.25); }
+    .metrics-wrap { padding:20px 24px; }
+    .metrics-tiles { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:10px; margin-bottom:16px; }
+    .metric-tile { background:var(--surface2); border:1px solid var(--border2); border-radius:var(--radius); padding:12px 14px; transition:border-color .2s; }
+    .metric-tile:hover { border-color:rgba(37,99,235,.25); }
+    .metric-tile__label { font-size:.7rem; color:var(--muted); margin-bottom:4px; font-weight:600; letter-spacing:.02em; }
+    .metric-tile__value { font-size:1.25rem; font-weight:800; color:var(--text); }
+    .metric-tile__unit { font-size:.72rem; color:var(--muted); margin-left:3px; font-weight:400; }
+    .lh-row { display:flex; align-items:center; gap:6px; font-size:.82rem; color:var(--muted); margin-bottom:4px; }
+    .lh-score { font-weight:800; font-size:.9rem; }
+    .score-good { color:#166534; }
+    .score-mid  { color:#92400e; }
+    .score-poor { color:#991b1b; }
+    .report-links { display:flex; flex-wrap:wrap; gap:10px; padding:16px 24px; border-top:1px solid var(--border2); background:var(--surface2); }
+    .report-btn { display:inline-flex; align-items:center; gap:6px; padding:7px 16px; border-radius:8px; font-size:.82rem; font-weight:600; text-decoration:none; cursor:pointer; transition:background .15s,border-color .15s; border:1px solid; }
+    .report-btn-html  { background:rgba(37,99,235,.1);  border-color:rgba(37,99,235,.3);  color:var(--accent); }
+    .report-btn-html:hover  { background:rgba(37,99,235,.18); }
+    .report-btn-excel { background:rgba(22,163,74,.1);  border-color:rgba(22,163,74,.3);  color:var(--green); }
+    .report-btn-excel:hover { background:rgba(22,163,74,.18); }
+    .report-btn-lh    { background:rgba(215,119,6,.1);  border-color:rgba(215,119,6,.3);  color:var(--yellow); }
+    .report-btn-lh:hover    { background:rgba(215,119,6,.18); }
+
+    /* ── Past reports ── */
+    .past-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:10px; margin-top:10px; }
+    .past-item { background:var(--surface2); border:1px solid var(--border2); border-radius:var(--radius); padding:12px 16px; display:flex; justify-content:space-between; align-items:center; gap:12px; transition:border-color .2s; }
+    .past-item:hover { border-color:rgba(37,99,235,.25); }
+    .past-item__name { font-size:.82rem; color:var(--text); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .past-item__time { font-size:.72rem; color:var(--muted); }
+    .section-divider { text-align:center; position:relative; margin:32px 0 24px; color:var(--muted); font-size:.78rem; font-weight:600; letter-spacing:.1em; text-transform:uppercase; }
+    .section-divider::before,.section-divider::after { content:''; position:absolute; top:50%; width:40%; height:1px; background:var(--border2); }
+    .section-divider::before { left:0; }
+    .section-divider::after  { right:0; }
+    #combined-report-wrap { text-align:center; margin:24px 0; display:none; }
+
+    @media(max-width:640px) {
+      .metrics-grid { grid-template-columns:1fr; }
+      .card { padding:20px 18px; }
+      .flow-action-bar { flex-direction:column; align-items:flex-start; }
+    }
+
+    /* ── Editable cells (contenteditable spans in Navigation Plan steps) ── */
+    .editable-cell {
+      border-bottom: 1.5px dashed rgba(37,99,235,.45);
+      border-radius: 2px; padding: 1px 4px; cursor: text;
+      outline: none; min-width: 20px; display: inline;
+      transition: border-color .15s, background .15s;
+    }
+    .editable-cell:hover { border-color: rgba(37,99,235,.8); background: rgba(37,99,235,.06); }
+    .editable-cell:focus { border-color: var(--accent); background: rgba(37,99,235,.08); box-shadow: 0 0 0 2px rgba(37,99,235,.15); border-radius: 3px; }
+
+    /* ── Credential inline inputs inside login step ── */
+    .cred-inputs-row {
+      display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap;
+      margin-top: 6px; background: rgba(124,58,237,.06);
+      border: 1px solid rgba(124,58,237,.2); border-radius: 8px; padding: 10px 14px;
+    }
+    .cred-input-group { display: flex; flex-direction: column; gap: 3px; }
+    .cred-input-label { font-size: .65rem; color: var(--accent2); font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+    .cred-input {
+      background: var(--surface2); border: 1px solid rgba(124,58,237,.3);
+      border-radius: 6px; color: var(--text); font-size: .8rem; padding: 5px 10px;
+      outline: none; width: 148px; font-family: inherit;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .cred-input:focus { border-color: var(--accent2); box-shadow: 0 0 0 2px rgba(124,58,237,.12); }
+    .cred-hint { font-size: .7rem; color: var(--muted); font-style: italic; align-self: center; }
+  </style>
+</head>
+<body>
+<div class="wrapper">
+
+  <!-- ── Hero ── -->
+  <div class="hero">
+    <div class="hero__badge"><span class="dot"></span>Web Performance Analyzer</div>
+    <h1>Performance Intelligence</h1>
+    <p>Measure, analyze, and optimize — powered by Playwright &amp; Lighthouse.</p>
+  </div>
+
+  <form id="analyze-form">
+
+    <!-- ── 1. URLs ── -->
+    <div class="card">
+      <div class="card__title">Target URLs</div>
+      <div id="url-list">
+        <div class="url-row">
+          <input type="url" placeholder="https://your-app.com/#/page" required
+                 oninput="scheduleFlowPreview()" onblur="scheduleFlowPreview()" />
+          <button type="button" class="btn-icon" title="Remove" onclick="removeUrl(this)">✕</button>
+        </div>
+      </div>
+      <button type="button" class="btn-add" onclick="addUrl()">+ Add another URL</button>
+    </div>
+
+    <!-- ── 2. Flow preview (auto-generated) ── -->
+    <div id="flow-preview-section">
+      <div class="flow-preview-card">
+        <div class="flow-preview-header">
+          <span class="flow-preview-header__title">Navigation Plan</span>
+          <span id="flow-plan-count" class="flow-preview-header__sub"></span>
+        </div>
+        <div class="flow-preview-body" id="flow-preview-body"></div>
+
+        <!-- Inline editor — always accessible, plan updates as you type -->
+        <div class="flow-inline-editor" id="flow-inline-editor" style="display:none;">
+          <div class="flow-inline-label">
+            <span>✏ Edit flow paths to update the plan above</span>
+            <button type="button" class="btn-browse-sm" onclick="openRoutesModal()">Browse Routes</button>
+          </div>
+          <textarea id="flow-input" rows="4"
+            oninput="livePreviewFlow()"
+            onpaste="setTimeout(livePreviewFlow, 50)"
+            placeholder="ip/catalog&#10;library/catalog&#10;query/search&#10;&#10;One path per line · full URLs also accepted"></textarea>
+          <!-- Live status: updates on every keystroke -->
+          <div id="flow-live-status"
+               style="display:none; align-items:center; gap:8px; padding:6px 0; font-size:.75rem;">
+            <span id="flow-live-icon" style="font-size:.85rem;"></span>
+            <span id="flow-live-text" style="flex:1;"></span>
+          </div>
+        </div>
+
+        <!-- Confirm bar -->
+        <div class="flow-action-bar" id="flow-confirm-bar">
+          <div class="flow-action-question">
+            <span class="q-icon">🤔</span>
+            <span>Is this navigation plan correct?</span>
+          </div>
+          <span class="flow-confirm-hint" id="flow-confirm-hint" style="display:none"></span>
+          <button type="button" class="btn-confirm-yes" id="btn-confirm-yes"
+                  onclick="confirmFlow()"
+                  title="Confirm navigation plan and run analysis">
+            ✓ Yes, looks correct
+          </button>
+        </div>
+
+        <!-- Confirmed bar -->
+        <div class="flow-confirmed-bar" id="flow-confirmed-bar">
+          <span class="flow-confirmed-icon">✅</span>
+          <span class="flow-confirmed-text">Navigation plan confirmed — ready to run</span>
+          <button type="button" class="btn-change-flow" onclick="unconfirmFlow()">Change</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 3. Analysis type + metrics ── -->
+    <div class="card">
+      <div class="card__title">Analysis Type</div>
+      <div class="metrics-grid">
+        <label class="metric-card">
+          <input type="radio" name="metricsType" value="playwright"
+                 onchange="scheduleFlowPreview()" />
+          <div class="metric-card__inner">
+            <span class="metric-card__icon">🎭</span>
+            <span class="metric-card__name">Web Vitals Google Bench Marks</span>
+            <span class="metric-card__desc">Navigation Timing, Web Vitals, CLS, INP & AG-grid</span>
+          </div>
+        </label>
+        <label class="metric-card">
+          <input type="radio" name="metricsType" value="lighthouse"
+                 onchange="scheduleFlowPreview()" />
+          <div class="metric-card__inner">
+            <span class="metric-card__icon">🔦</span>
+            <span class="metric-card__name">Lighthouse</span>
+            <span class="metric-card__desc">Google audit — scores, opportunities, diagnostics</span>
+          </div>
+        </label>
+        <label class="metric-card">
+          <input type="radio" name="metricsType" value="both" checked
+                 onchange="scheduleFlowPreview()" />
+          <div class="metric-card__inner">
+            <span class="metric-card__icon">⚡</span>
+            <span class="metric-card__name">Both</span>
+            <span class="metric-card__desc">Full analysis — Playwright metrics + Lighthouse audit</span>
+          </div>
+        </label>
+      </div>
+      <div style="margin-top:22px;">
+        <label style="margin-bottom:10px;color:var(--text);font-size:.8rem;">Playwright Metrics Collected</label>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px;margin-top:8px;">
+          <span class="metric-pill">PLT (Page Load Time)</span>
+          <span class="metric-pill">FCP (First Contentful Paint)</span>
+          <span class="metric-pill">LCP (Largest Contentful Paint)</span>
+          <span class="metric-pill">TTI (Time to Interactive)</span>
+          <span class="metric-pill">CLS (Cumulative Layout Shift)</span>
+          <span class="metric-pill">TTFB (Time to First Byte)</span>
+          <span class="metric-pill">TBT (Total Blocking Time)</span>
+          <span class="metric-pill">INP (Interaction to Next Paint)</span>
+          <span class="metric-pill">DNS (DNS Lookup Time)</span>
+          <span class="metric-pill">TCP (TCP Connection Time)</span>
+          <span class="metric-pill">DCL (DOM Content Loaded)</span>
+          <span class="metric-pill">AGG (AG-Grid Spinner Time)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 4. Submit ── -->
+    <button type="submit" class="btn-submit" id="submit-btn">
+      <div class="spinner"></div>
+      <span class="btn-text">Run Analysis</span>
+    </button>
+
+  </form>
+
+  <!-- ── Progress ── -->
+  <div id="progress-section">
+    <div class="section-divider">Live Progress</div>
+    <div id="url-chips"></div>
+    <div class="progress-wrap"><div class="progress-bar" id="progress-bar"></div></div>
+    <div class="card" style="padding:0;overflow:hidden;">
+      <div class="card__title" style="padding:14px 18px 10px;margin:0;border-bottom:1px solid var(--border2);">
+        Terminal Output
+        <button onclick="clearTerminal()" style="background:none;border:none;color:var(--muted);font-size:.75rem;cursor:pointer;margin-left:auto;">clear</button>
+      </div>
+      <div class="terminal" id="terminal"></div>
+    </div>
+  </div>
+
+  <!-- ── Results ── -->
+  <div id="results-section">
+    <div class="section-divider">Results</div>
+    <div class="results-header">
+      <h2>Analysis Complete</h2>
+      <button class="btn-secondary" onclick="resetForm()">New Analysis</button>
+    </div>
+    <div id="results-cards"></div>
+    <div id="combined-report-wrap">
+      <a id="combined-report-btn"
+         class="btn-submit"
+         style="max-width:340px;margin:0 auto;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:8px;"
+         href="#" target="_blank">
+        📊 Open Combined Report
+      </a>
+    </div>
+  </div>
+
+  <!-- ── Past reports ── -->
+  <div class="section-divider" id="past-section-label" style="display:none;">Recent Reports</div>
+  <div class="card" id="past-reports-card" style="display:none;">
+    <div class="card__title">Recent HTML Reports</div>
+    <div class="past-grid" id="past-grid"></div>
+  </div>
+</div>
+
+<!-- ── Routes modal ── -->
+<div id="routes-modal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeRoutesModal()">✕</button>
+    <h3>Navigation Routes (navigation-routes.md)</h3>
+    <div id="modal-routes"></div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+//  URL management
+// ─────────────────────────────────────────────────────────────────────────────
+function addUrl() {
+  const list = document.getElementById('url-list');
+  const row  = document.createElement('div');
+  row.className = 'url-row';
+  row.innerHTML = `
+    <input type="url" placeholder="https://your-app.com/#/page"
+           oninput="scheduleFlowPreview()" onblur="scheduleFlowPreview()"
+           onpaste="setTimeout(scheduleFlowPreview, 50)" />
+    <button type="button" class="btn-icon" title="Remove" onclick="removeUrl(this)">✕</button>
+  `;
+  list.appendChild(row);
+  row.querySelector('input').focus();
+  // Don't call scheduleFlowPreview here — new row is empty, plan stays unchanged
+}
+
+function removeUrl(btn) {
+  const rows = document.querySelectorAll('.url-row');
+  if (rows.length <= 1) return;
+  btn.closest('.url-row').remove();
+  scheduleFlowPreview();
+}
+
+function getUrls() {
+  return [...document.querySelectorAll('#url-list input')]
+    .map(i => i.value.trim()).filter(Boolean);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Client-side URL helpers (mirrors NavigationRouter logic)
+// ─────────────────────────────────────────────────────────────────────────────
+function extractHashPath(url) {
+  try {
+    const idx = url.indexOf('#');
+    let p = idx >= 0 ? url.substring(idx + 1) : new URL(url).pathname;
+    return p.replace(/^\/+/, '').split('?')[0].replace(/\/+$/, '').toLowerCase().trim();
+  } catch { return ''; }
+}
+function isLoginPath(p) {
+  return p.includes('signin') || p.includes('login') || p.startsWith('security');
+}
+function findRouteFor(hashPath, routes) {
+  const sorted = [...routes].sort((a, b) => b.route.length - a.route.length);
+  const exact  = sorted.find(r => r.route === hashPath);
+  if (exact) return exact;
+  return sorted.find(r => r.isDynamic && hashPath.startsWith(r.route));
+}
+function shortUrl(u) {
+  try {
+    const x = new URL(u);
+    const h = x.hash.replace(/^#\//, '').split('?')[0];
+    return h ? x.hostname + '/' + h : x.hostname;
+  } catch { return u.slice(0, 40); }
+}
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Flow preview state machine
+//  States: 'empty' | 'preview' | 'confirmed' | 'editing'
+// ─────────────────────────────────────────────────────────────────────────────
+let flowState          = 'empty';
+let routesCache        = null;
+let previewTimer       = null;
+let routeEdits         = {};   // { [routePattern]: { [stepIdx]: { selector?, label?, stype? } } }
+let credentialOverrides = null; // { username, password } or null
+
+function scheduleFlowPreview() {
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(generateFlowPreview, 500);
+}
+
+async function generateFlowPreview() {
+  const urls = getUrls();
+  if (!urls.length) { setFlowState('empty'); return; }
+
+  // Load routes once (or reload after adding a new route)
+  if (!routesCache) {
+    try { routesCache = await fetch('/api/routes').then(r => r.json()); }
+    catch { routesCache = []; }
+  }
+
+  const metricsType = document.querySelector('input[name="metricsType"]:checked')?.value ?? 'both';
+  const html = urls.map((url, i) => buildUrlPreview(i + 1, url, metricsType)).join('');
+  document.getElementById('flow-preview-body').innerHTML = html;
+
+  // Update header count
+  const n = urls.length;
+  document.getElementById('flow-plan-count').textContent =
+    `${n} URL${n !== 1 ? 's' : ''} · auto-generated from navigation-routes.md`;
+
+  if (flowState === 'confirmed' || flowState !== 'editing') {
+    setFlowState('preview');
+  }
+}
+
+function setFlowState(state) {
+  flowState = state;
+  const section     = document.getElementById('flow-preview-section');
+  const confirmBar  = document.getElementById('flow-confirm-bar');
+  const confirmedBar= document.getElementById('flow-confirmed-bar');
+  const editor      = document.getElementById('flow-inline-editor');
+  const confirmBtn  = document.getElementById('btn-confirm-yes');
+  const confirmHint = document.getElementById('flow-confirm-hint');
+
+  if (state === 'empty') {
+    section.style.display = 'none';
+    return;
+  }
+
+  section.style.display = 'block';
+
+  if (state === 'preview') {
+    confirmBar.style.display   = 'flex';
+    confirmedBar.className     = 'flow-confirmed-bar';
+    editor.style.display       = 'block';
+    if (confirmBtn) { confirmBtn.disabled = false; }
+    if (confirmHint) confirmHint.style.display = 'none';
+  } else if (state === 'confirmed') {
+    confirmBar.style.display   = 'none';
+    confirmedBar.className     = 'flow-confirmed-bar show';
+    editor.style.display       = 'block';
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Define-steps helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Each non-empty line becomes a click step.
+// Handles three formats:
+//   css: `selector` — label        (AI Parse output / power-user)
+//   xpath: `selector` — label
+//   text: `visible text` — label
+//   plain text                      (simple label → text selector)
+function parseStepLines(text) {
+  return text.split('\n')
+    .map(l => l.trim()).filter(Boolean)
+    .map(line => {
+      // Format: type: `selector` — label  (with or without backticks)
+      const withBacktick = line.match(/^(css|xpath|text):\s*`([^`]+)`\s*[—–\-]+\s*(.*)$/i);
+      if (withBacktick) {
+        return { selectorType: withBacktick[1].toLowerCase(), selector: withBacktick[2].trim(), description: withBacktick[3].trim() || withBacktick[2].trim() };
+      }
+      // Format: type: selector — label  (no backticks)
+      const noBacktick = line.match(/^(css|xpath|text):\s*(.+?)\s*[—–\-]+\s*(.+)$/i);
+      if (noBacktick) {
+        return { selectorType: noBacktick[1].toLowerCase(), selector: noBacktick[2].trim(), description: noBacktick[3].trim() };
+      }
+      // Plain text — use Playwright's text selector
+      return { selectorType: 'text', selector: line, description: line };
+    });
+}
+
+function onDefineStepsInput(el) {
+  const text     = el.value.trim();
+  const statusEl = el.nextElementSibling;
+  if (!statusEl) return;
+  if (!text) { statusEl.textContent = ''; return; }
+
+  const count = text.split('\n').map(l => l.trim()).filter(Boolean).length;
+  statusEl.style.color = 'var(--green)';
+  statusEl.textContent = `✓ ${count} click step${count !== 1 ? 's' : ''} — Playwright will click through these (no page.goto)`;
+  enableConfirmButton();
+}
+
+function openDynamicStepEditor(stepEl) {
+  stepEl.classList.add('editing');
+  const textarea = stepEl.querySelector('.step-define-input');
+  if (textarea) { textarea.focus(); }
+}
+
+async function aiParseSteps(btn) {
+  const section  = btn.closest('.step-define-section');
+  const textarea = section.querySelector('.step-define-input');
+  const statusEl = section.querySelector('.step-define-status');
+  const text     = textarea.value.trim();
+  if (!text) { statusEl.textContent = '⚠ Type something first'; return; }
+
+  // Pass the hash path as URL context so Claude can derive exact table row text
+  const hashPath = textarea.dataset.hash ?? '';
+  const firstUrl = getUrls()[0] ?? '';
+  let targetUrl  = '';
+  try {
+    const origin = firstUrl ? new URL(firstUrl).origin : '';
+    targetUrl    = origin && hashPath ? `${origin}/#/${hashPath}` : hashPath;
+  } catch { targetUrl = hashPath; }
+
+  btn.disabled    = true;
+  btn.textContent = '⏳ Parsing…';
+  statusEl.textContent = '';
+
+  try {
+    const resp = await fetch('/api/steps/ai-parse', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ text, url: targetUrl }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error ?? resp.statusText);
+
+    // data.steps are already formatted: "css: `...` — label" or plain text
+    textarea.value = Array.isArray(data.steps) ? data.steps.join('\n') : data.steps;
+    onDefineStepsInput(textarea);
+    enableConfirmButton();
+  } catch (e) {
+    statusEl.style.color = 'var(--red)';
+    statusEl.textContent = `✗ ${e.message}`;
+  } finally {
+    btn.disabled    = false;
+    btn.textContent = '✨ AI Parse';
+  }
+}
+
+function lockDefinedStepInputs() {
+  document.querySelectorAll('.step-define-input').forEach(el => {
+    const text = el.value.trim();
+    if (!text) return;
+    el.setAttribute('readonly', '');
+    const stepEl = el.closest('.step-dynamic, .step-missing');
+    if (stepEl) {
+      stepEl.classList.remove('editing');
+      stepEl.classList.add('confirmed');
+    }
+    const count = text.split('\n').filter(l => l.trim()).length;
+    const statusEl = el.nextElementSibling;
+    if (statusEl) {
+      statusEl.innerHTML = `<span class="step-define-saved-badge">✓ Saved — ${count} click step${count !== 1 ? 's' : ''} will be used by Playwright</span>`;
+    }
+  });
+}
+
+async function collectAndSaveDefinedSteps() {
+  const inputs = document.querySelectorAll('.step-define-input');
+  const promises = [];
+  for (const el of inputs) {
+    const hashPath = el.dataset.hash;
+    const text     = el.value.trim();
+    if (!hashPath || !text) continue;
+    const steps = parseStepLines(text);
+    if (!steps.length) continue;
+    const description = hashPath.replace(/\//g, ' › ') + ' page';
+    promises.push(
+      fetch('/api/routes/save', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ pattern: hashPath, description, isDynamic: false, steps }),
+      }),
+    );
+  }
+  if (promises.length) {
+    await Promise.all(promises);
+    routesCache = null;
+  }
+  return promises.length;
+}
+
+async function confirmFlow() {
+  await saveRouteEdits();
+
+  // Save any click-step definitions typed into "step-missing" panels
+  const definedCount = await collectAndSaveDefinedSteps();
+
+  // Persist new textarea paths to navigation-routes.md
+  const flowText = document.getElementById('flow-input').value.trim();
+  if (flowText) {
+    try {
+      const resp = await fetch('/api/flow/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ flow: flowText }),
+      });
+      const data = await resp.json();
+      const totalSaved = (data.count ?? 0) + definedCount;
+      if (totalSaved > 0) {
+        routesCache = null;
+        const statusEl = document.getElementById('flow-live-status');
+        const iconEl   = document.getElementById('flow-live-icon');
+        const textEl   = document.getElementById('flow-live-text');
+        if (statusEl && iconEl && textEl) {
+          statusEl.style.display = 'flex';
+          iconEl.textContent = '💾';
+          iconEl.style.color = 'var(--cyan)';
+          textEl.textContent = `${totalSaved} route(s) saved to navigation-routes.md`;
+          textEl.style.color = 'var(--cyan)';
+        }
+      }
+    } catch { /* non-fatal */ }
+  } else if (definedCount > 0) {
+    routesCache = null;
+  }
+
+  // Lock any filled-in define-step textareas in place so the user can see what they saved
+  if (definedCount > 0) {
+    lockDefinedStepInputs();
+  }
+
+  setFlowState('confirmed');
+  document.getElementById('flow-preview-section').scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+function unconfirmFlow() {
+  const btn  = document.getElementById('btn-confirm-yes');
+  const hint = document.getElementById('flow-confirm-hint');
+  if (btn)  { btn.disabled = false; }
+  if (hint) hint.style.display = 'none';
+  setFlowState('preview');
+  setTimeout(() => document.getElementById('flow-input').focus(), 150);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Inline editing helpers
+// ─────────────────────────────────────────────────────────────────────────────
+function enableConfirmButton() {
+  const btn  = document.getElementById('btn-confirm-yes');
+  const hint = document.getElementById('flow-confirm-hint');
+  if (btn && btn.disabled) { btn.disabled = false; }
+  if (hint) hint.style.display = 'none';
+}
+
+function onStepFieldEdit(el) {
+  const route = el.dataset.route;
+  const step  = parseInt(el.dataset.step ?? '0', 10);
+  const field = el.dataset.field;   // 'selector' or 'label'
+  const stype = el.dataset.stype;   // 'css' or 'xpath'
+  const value = el.textContent.trim();
+  if (!route) return;
+  if (!routeEdits[route]) routeEdits[route] = {};
+  if (!routeEdits[route][step]) routeEdits[route][step] = { stype };
+  routeEdits[route][step][field] = value;
+  enableConfirmButton();
+}
+
+function onCredentialEdit() {
+  const u = document.getElementById('cred-username');
+  const p = document.getElementById('cred-password');
+  if (!u || !p) return;
+  const username = u.value.trim();
+  const password = p.value;
+  credentialOverrides = (username || password) ? { username, password } : null;
+  enableConfirmButton();
+}
+
+async function saveRouteEdits() {
+  const entries = Object.entries(routeEdits);
+  if (!entries.length) return;
+  const promises = entries.map(([routePattern, stepEdits]) => {
+    const origRoute = (routesCache ?? []).find(r => r.route === routePattern);
+    if (!origRoute) return Promise.resolve();
+    const steps = origRoute.steps.map((s, idx) => {
+      const m = s.match(/^(css|xpath):\s*`([^`]+)`\s*[—–-]+\s*(.+)$/i);
+      const origStype    = m ? m[1] : 'css';
+      const origSelector = m ? m[2] : s;
+      const origLabel    = m ? m[3] : '';
+      const edit = stepEdits[idx] || {};
+      return {
+        selectorType: edit.stype    || origStype,
+        selector:     edit.selector !== undefined ? edit.selector : origSelector,
+        description:  edit.label    !== undefined ? edit.label    : origLabel,
+      };
+    });
+    return fetch('/api/routes/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pattern: routePattern, description: origRoute.description, isDynamic: origRoute.isDynamic, steps }),
+    });
+  });
+  await Promise.all(promises);
+  routesCache = null;  // invalidate so next preview reloads fresh routes
+  routeEdits  = {};
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Build preview HTML for a single URL
+// ─────────────────────────────────────────────────────────────────────────────
+function buildUrlPreview(num, url, metricsType) {
+  const hashPath = extractHashPath(url);
+  const isSignin = isLoginPath(hashPath);
+  const route    = isSignin ? null : findRouteFor(hashPath, routesCache ?? []);
+
+  // Build steps
+  const steps = [];
+  let stepN = 1;
+
+  if (isSignin) {
+    steps.push(makeStep(stepN++, 'step-nav',     'Navigate directly to signin page',         `page.goto(${url})`));
+    steps.push(makeStep(stepN++, 'step-observe', 'Inject Web Vitals observer',                 'active before first paint'));
+    steps.push(makeStep(stepN++, 'step-wait',    'Wait for signin page ready',                 'username input visible'));
+    steps.push(makeStep(stepN++, 'step-collect', collectLabel(metricsType),                    ''));
+  } else {
+    steps.push(makeStep(stepN++, 'step-nav',     'Navigate to signin page',                    `page.goto(loginUrl)`));
+    steps.push(makeLoginStep(stepN++));
+    steps.push(makeStep(stepN++, 'step-wait',    'Wait for home page ready',                   `waitForCurrentPage() → #/home`));
+    steps.push(makeStep(stepN++, 'step-observe', 'Inject Web Vitals observer',                 'active before target navigation'));
+
+    if (route && !route.isDynamic && route.steps.length) {
+      steps.push(makeStep(stepN++, 'step-click', `NavigationAgent — ${route.description}`, ''));
+      route.steps.forEach((s, sIdx) => {
+        const m = s.match(/^(css|xpath):\s*`([^`]+)`\s*[—–-]+\s*(.+)$/i);
+        if (m) {
+          steps.push(makeActionStep(route.route, sIdx, m[1], m[2], m[3]));
+        } else {
+          const dashIdx = s.indexOf(' — ');
+          const sel = dashIdx >= 0 ? s.slice(0, dashIdx).trim() : s.trim();
+          const lbl = dashIdx >= 0 ? s.slice(dashIdx + 3).trim() : '';
+          steps.push(makeActionStep(route.route, sIdx, 'css', sel, lbl));
+        }
+      });
+    } else if (route?.isDynamic) {
+      const safeHash = escHtml(hashPath);
+      steps.push(`
+        <div class="preview-step step-dynamic" ondblclick="openDynamicStepEditor(this)" title="Double-click to define click steps instead">
+          <div class="step-num">${stepN++}</div>
+          <div class="step-body">
+            <div class="step-label">Dynamic route — direct URL navigation</div>
+            <div class="step-detail">Variable ID in URL — no fixed menu path · uses page.goto()</div>
+            <div class="step-dynamic-hint">Double-click to replace with click-based navigation</div>
+            <div class="step-define-section" onclick="event.stopPropagation()">
+              <div class="step-define-label">
+                🖱 Type what to click — Playwright will navigate using these text labels (no CSS/XPath needed)
+              </div>
+              <textarea class="step-define-input"
+                data-hash="${safeHash}"
+                rows="3"
+                placeholder="Open Catalogs dropdown&#10;IP Catalog"
+                oninput="onDefineStepsInput(this)"></textarea>
+              <button class="btn-ai-parse" onclick="aiParseSteps(this)" title="Let Claude convert your description into atomic click steps">✨ AI Parse</button>
+              <div class="step-define-status"></div>
+            </div>
+          </div>
+        </div>`);
+    } else {
+      // No route found — offer to define click steps or add as dynamic
+      const safeHash = escHtml(hashPath);
+      steps.push(`
+        <div class="preview-step step-missing">
+          <div class="step-num">${stepN++}</div>
+          <div class="step-body">
+            <div class="step-label">No route registered for <code style="color:var(--cyan)">#/${safeHash}</code></div>
+            <div class="step-missing-row">
+              <span class="step-missing-msg">
+                Define click steps below so Playwright navigates via UI actions,
+                or add as a dynamic route (falls back to <code>page.goto()</code>).
+              </span>
+              <button class="btn-add-route"
+                onclick="addDynamicRoute('${escHtml(hashPath)}', this)"
+                title="Appends ## ${safeHash}/ [dynamic] to navigation-routes.md">
+                + Add as dynamic route
+              </button>
+            </div>
+            <div class="step-define-section">
+              <div class="step-define-label">
+                🖱 Type what to click — Playwright will navigate using these text labels (no CSS/XPath needed)
+              </div>
+              <textarea class="step-define-input"
+                data-hash="${escHtml(hashPath)}"
+                rows="3"
+                placeholder="Open Catalogs dropdown&#10;IP Catalog"
+                oninput="onDefineStepsInput(this)"></textarea>
+              <button class="btn-ai-parse" onclick="aiParseSteps(this)" title="Let Claude convert your description into atomic click steps">✨ AI Parse</button>
+              <div class="step-define-status"></div>
+            </div>
+          </div>
+        </div>`);
+    }
+
+    steps.push(makeStep(stepN++, 'step-wait',    'Wait for page readiness',                   `waitForCurrentPage() → page-name visible`));
+    steps.push(makeStep(stepN++, 'step-collect', collectLabel(metricsType),                    ''));
+    if (metricsType !== 'playwright') {
+      steps.push(makeStep(stepN++, 'step-lh', 'Lighthouse audit',                             'separate Chrome instance, authenticated'));
+    }
+  }
+
+  // Badge
+  let badge = '';
+  if (isSignin)            badge = `<span class="preview-route-badge badge-signin">signin page</span>`;
+  else if (!route)         badge = `<span class="preview-route-badge badge-missing">no route</span>`;
+  else if (route.isDynamic)badge = `<span class="preview-route-badge badge-dynamic">dynamic</span>`;
+  else                     badge = `<span class="preview-route-badge badge-found">✓ route found</span>`;
+
+  return `
+    <div class="preview-url-block">
+      <div class="preview-url-header">
+        <div class="preview-url-num">${num}</div>
+        <div style="flex:1; min-width:0;">
+          <div class="preview-url-name">${escHtml(shortUrl(url))}</div>
+          <div class="preview-url-full">${escHtml(url)}</div>
+        </div>
+        ${badge}
+      </div>
+      <div class="preview-steps">${steps.join('')}</div>
+    </div>
+  `;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Live preview — called on every keystroke inside the flow textarea
+// ─────────────────────────────────────────────────────────────────────────────
+function livePreviewFlow() {
+  const customFlow  = document.getElementById('flow-input').value.trim();
+  const metricsType = document.querySelector('input[name="metricsType"]:checked')?.value ?? 'both';
+
+  // Parse textarea into full URLs (same logic as server-side parseFlow)
+  let previewUrls;
+  if (customFlow) {
+    const firstUrl = getUrls()[0] ?? '';
+    const origin   = (() => { try { return firstUrl ? new URL(firstUrl).origin : ''; } catch { return ''; } })();
+    previewUrls = customFlow.split(/[\n,]+/)
+      .map(l => l.trim()).filter(Boolean)
+      .map(line => {
+        if (line.startsWith('http')) return line;
+        return origin ? `${origin}/#/${line.replace(/^[#/\s]+/, '')}` : line;
+      });
+  } else {
+    // Textarea cleared — fall back to URL inputs
+    previewUrls = getUrls();
+  }
+
+  if (!previewUrls.length) return;
+
+  // Rebuild plan HTML
+  const html = previewUrls.map((url, i) => buildUrlPreview(i + 1, url, metricsType)).join('');
+  document.getElementById('flow-preview-body').innerHTML = html;
+
+  // Update header — show "live" indicator
+  const n = previewUrls.length;
+  document.getElementById('flow-plan-count').textContent =
+    `${n} URL${n !== 1 ? 's' : ''} · ${customFlow ? 'custom flow' : 'URL inputs'} · live`;
+
+  // Show preview section + confirm bar
+  document.getElementById('flow-preview-section').style.display = 'block';
+  document.getElementById('flow-confirm-bar').style.display     = 'flex';
+  document.getElementById('flow-confirmed-bar').className       = 'flow-confirmed-bar';
+  flowState = 'preview'; // user has edited — allow confirmation
+
+  // Enable the confirm button (user has actively engaged with the plan)
+  const btn  = document.getElementById('btn-confirm-yes');
+  const hint = document.getElementById('flow-confirm-hint');
+  if (btn && previewUrls.length > 0) { btn.disabled = false; }
+  if (hint) hint.style.display = 'none';
+
+  // ── Live status bar inside the edit card ──────────────────────────────────
+  const missing   = previewUrls.filter(u => {
+    const p = extractHashPath(u);
+    return !isLoginPath(p) && !findRouteFor(p, routesCache ?? []);
+  }).length;
+  const dynamic   = previewUrls.filter(u => {
+    const p = extractHashPath(u);
+    const r = findRouteFor(p, routesCache ?? []);
+    return r?.isDynamic;
+  }).length;
+  const withRoute = n - missing - previewUrls.filter(u => isLoginPath(extractHashPath(u))).length - dynamic;
+
+  let icon = '✓';
+  let msg  = `${n} URL${n!==1?'s':''} detected`;
+  let color = 'var(--green)';
+  const parts = [];
+  if (withRoute > 0) parts.push(`${withRoute} with UI route`);
+  if (dynamic   > 0) parts.push(`${dynamic} dynamic`);
+  if (missing   > 0) { parts.push(`${missing} missing route`); icon = '⚠'; color = 'var(--yellow)'; }
+  if (parts.length)  msg += ' — ' + parts.join(' · ');
+
+  const statusEl  = document.getElementById('flow-live-status');
+  const iconEl    = document.getElementById('flow-live-icon');
+  const textEl    = document.getElementById('flow-live-text');
+  if (statusEl && iconEl && textEl) {
+    statusEl.style.display = 'flex';
+    iconEl.textContent     = icon;
+    iconEl.style.color     = color;
+    textEl.textContent     = msg;
+    textEl.style.color     = color;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Add dynamic route to navigation-routes.md
+// ─────────────────────────────────────────────────────────────────────────────
+async function addDynamicRoute(hashPath, btn) {
+  btn.disabled = true;
+  btn.textContent = 'Adding…';
+  try {
+    const resp = await fetch('/api/routes/add', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hashPath, isDynamic: true }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error);
+    // Refresh routes cache and regenerate preview
+    routesCache = null;
+    btn.textContent = '✓ Added';
+    btn.style.background = 'rgba(22,163,74,.15)';
+    btn.style.borderColor = 'rgba(22,163,74,.35)';
+    btn.style.color = 'var(--green)';
+    // Regenerate after short delay so user sees the success state
+    setTimeout(generateFlowPreview, 800);
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = '✗ Failed';
+    btn.title = String(e);
+    setTimeout(() => { btn.textContent = '+ Add as dynamic route'; btn.disabled = false; }, 2000);
+  }
+}
+
+function makeStep(n, cls, label, detail) {
+  return `
+    <div class="preview-step ${cls}">
+      <div class="step-num">${n}</div>
+      <div class="step-body">
+        <div class="step-label">${escHtml(label)}</div>
+        ${detail ? `<div class="step-detail">${escHtml(detail)}</div>` : ''}
+      </div>
+    </div>`;
+}
+
+function makeActionStep(routePattern, stepIdx, selectorType, selector, label) {
+  const ed = (field, cls, text) => `<span contenteditable="true"
+      class="editable-cell ${cls}"
+      data-route="${escHtml(routePattern)}"
+      data-step="${stepIdx}"
+      data-field="${field}"
+      data-stype="${escHtml(selectorType)}"
+      onblur="onStepFieldEdit(this)"
+      title="Click to edit"
+    >${escHtml(text)}</span>`;
+  return `
+    <div class="preview-step step-action" style="padding-left:36px;">
+      <div class="step-body">
+        <div class="step-action-row">
+          <span class="step-arrow">→</span>
+          <span style="font-size:.66rem;color:var(--muted);margin-right:3px;flex-shrink:0">[${escHtml(selectorType)}]</span>
+          ${ed('selector', 'step-selector', selector)}
+          ${label ? `<span style="color:var(--muted);margin:0 5px;flex-shrink:0">—</span>${ed('label', 'step-sel-label', label)}` : ''}
+        </div>
+      </div>
+    </div>`;
+}
+
+function makeLoginStep(n) {
+  return `
+    <div class="preview-step step-login">
+      <div class="step-num">${n}</div>
+      <div class="step-body">
+        <div class="step-label">Enter credentials → click Submit</div>
+        <div class="cred-inputs-row">
+          <div class="cred-input-group">
+            <span class="cred-input-label">Username</span>
+            <input id="cred-username" class="cred-input" type="text"
+                   placeholder="from config.properties"
+                   oninput="onCredentialEdit()" autocomplete="username" />
+          </div>
+          <div class="cred-input-group">
+            <span class="cred-input-label">Password</span>
+            <input id="cred-password" class="cred-input" type="password"
+                   placeholder="from config.properties"
+                   oninput="onCredentialEdit()" autocomplete="current-password" />
+          </div>
+          <span class="cred-hint">Leave blank to use config.properties values</span>
+        </div>
+      </div>
+    </div>`;
+}
+
+function collectLabel(mt) {
+  if (mt === 'playwright') return 'Collect Playwright metrics: PLT · FCP · LCP · TTI · CLS · TTFB · TBT · INP · DNS · TCP · DCL · AGG';
+  if (mt === 'lighthouse')  return 'Run Lighthouse audit (separate Chrome instance)';
+  return 'Collect Playwright metrics + Lighthouse audit';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Routes modal
+// ─────────────────────────────────────────────────────────────────────────────
+async function openRoutesModal() {
+  document.getElementById('routes-modal').classList.add('open');
+  if (routesCache) { renderRoutes(routesCache); return; }
+  const box = document.getElementById('modal-routes');
+  box.innerHTML = '<p style="color:var(--muted);text-align:center;padding:20px;">Loading routes…</p>';
+  try {
+    routesCache = await fetch('/api/routes').then(r => r.json());
+    renderRoutes(routesCache);
+  } catch (e) {
+    box.innerHTML = `<p style="color:var(--red)">Failed to load routes: ${e}</p>`;
+  }
+}
+function renderRoutes(routes) {
+  const box = document.getElementById('modal-routes');
+  if (!routes.length) { box.innerHTML = '<p style="color:var(--muted)">No routes found.</p>'; return; }
+  box.innerHTML = routes.map(r => `
+    <div class="route-item">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+        <span class="route-item__pattern">#/${r.route}</span>
+        <span class="route-badge ${r.isDynamic?'badge-dynamic':'badge-static'}">${r.isDynamic?'dynamic':'static'}</span>
+      </div>
+      <div class="route-item__desc">${escHtml(r.description)}</div>
+      ${r.steps.length?`<div style="margin-top:6px;">${r.steps.map((s,i)=>`<div style="font-size:.72rem;color:var(--muted)">&nbsp;&nbsp;${i+1}. ${escHtml(s)}</div>`).join('')}</div>`:''}
+    </div>`).join('');
+}
+function closeRoutesModal() { document.getElementById('routes-modal').classList.remove('open'); }
+document.getElementById('routes-modal').addEventListener('click', function(e){ if(e.target===this)closeRoutesModal(); });
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Form submit
+// ─────────────────────────────────────────────────────────────────────────────
+document.getElementById('analyze-form').addEventListener('submit', async function(e) {
+  e.preventDefault();
+
+  const urls = getUrls();
+  if (!urls.length) { alert('Please enter at least one URL.'); return; }
+
+  const metricsType = document.querySelector('input[name="metricsType"]:checked')?.value ?? 'both';
+  const flow = document.getElementById('flow-input').value.trim();
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.classList.add('loading');
+  btn.querySelector('.btn-text').textContent = 'Analyzing…';
+
+  document.getElementById('results-section').style.display = 'none';
+  document.getElementById('progress-section').style.display = 'block';
+  document.getElementById('combined-report-wrap').style.display = 'none';
+  document.getElementById('results-cards').innerHTML = '';
+  document.getElementById('terminal').innerHTML = '';
+  setupChips(urls);
+  setProgress(0);
+  document.getElementById('progress-section').scrollIntoView({ behavior:'smooth', block:'start' });
+
+  let total = urls.length, done = 0;
+  const allResults = [];
+
+  // Save any pending route edits silently before running
+  try { await saveRouteEdits(); } catch {}
+
+  try {
+    const resp = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ urls, metricsType, flow, credentials: credentialOverrides }),
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ error: resp.statusText }));
+      throw new Error(err.error ?? resp.statusText);
+    }
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const { done: rd, value } = await reader.read();
+      if (rd) break;
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split('\n\n');
+      buffer = parts.pop() ?? '';
+      for (const part of parts) {
+        const line = part.trim();
+        if (!line.startsWith('data:')) continue;
+        let ev; try { ev = JSON.parse(line.slice(5)); } catch { continue; }
+        handleEvent(ev);
+        if (ev.t === 'start')     { total = ev.total; setupChips(urls); }
+        if (ev.t === 'url_start') setChipRunning(ev.index - 1);
+        if (ev.t === 'url_done')  { done++; setChipDone(done-1); setProgress(done/total*100); allResults.push(ev); renderResult(ev); }
+        if (ev.t === 'url_err')   { done++; setChipError(done-1); setProgress(done/total*100); }
+        if (ev.t === 'complete')  showAllDone(allResults);
+      }
+    }
+  } catch (err) {
+    logLine('error', '✗ ' + String(err));
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('loading');
+    btn.querySelector('.btn-text').textContent = 'Run Analysis';
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Progress / terminal
+// ─────────────────────────────────────────────────────────────────────────────
+function handleEvent(ev) {
+  if      (ev.t === 'log')       logLine(ev.lvl, ev.msg);
+  else if (ev.t === 'start')     logLine('event', `▶ Starting — ${ev.total} URL(s) [${ev.metricsType}]`);
+  else if (ev.t === 'url_start') logLine('event', `⟳ [${ev.index}/${ev.total}] ${ev.name} — ${ev.url}`);
+  else if (ev.t === 'url_done')  logLine('done',  `✓ Done: ${ev.name} — Overall: ${ev.overallStatus ?? 'N/A'}`);
+  else if (ev.t === 'url_err')   logLine('error', `✗ Error on ${ev.url}: ${ev.msg}`);
+  else if (ev.t === 'complete')  logLine('done',  `✓ Complete — ${ev.results?.length ?? 0} URL(s) processed`);
+  else if (ev.t === 'error')     logLine('error', `✗ ${ev.msg}`);
+}
+function logLine(lvl, msg) {
+  const t = document.getElementById('terminal');
+  const d = document.createElement('div');
+  d.className = 'log-' + (lvl === 'event' ? 'event' : lvl === 'done' ? 'done' : lvl === 'warn' ? 'warn' : lvl === 'error' ? 'error' : 'info');
+  const ts = new Date().toLocaleTimeString('en-US', { hour12:false });
+  d.textContent = `[${ts}] ${msg}`;
+  t.appendChild(d);
+  t.scrollTop = t.scrollHeight;
+}
+function clearTerminal() { document.getElementById('terminal').innerHTML = ''; }
+
+function setupChips(urls) {
+  document.getElementById('url-chips').innerHTML = urls.map((u,i) =>
+    `<div class="chip" id="chip-${i}"><span class="chip-dot"></span><span>${shortUrl(u)}</span></div>`
+  ).join('');
+}
+function setChipRunning(i) { setChipClass(i, 'running'); }
+function setChipDone(i)    { setChipClass(i, 'done'); }
+function setChipError(i)   { setChipClass(i, 'error'); }
+function setChipClass(i, c){ const el = document.getElementById('chip-'+i); if(el) el.className='chip '+c; }
+function setProgress(pct)  { document.getElementById('progress-bar').style.width = pct + '%'; }
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Result cards
+// ─────────────────────────────────────────────────────────────────────────────
+function renderResult(ev) {
+  document.getElementById('results-cards').appendChild(buildResultCard(ev));
+  document.getElementById('results-section').style.display = 'block';
+}
+function buildResultCard(ev) {
+  const sCls = statusCls(ev.overallStatus);
+  const el   = document.createElement('div');
+  el.className = 'result-card';
+
+  let tiles = '';
+  if (ev.metrics) {
+    tiles = Object.entries(ev.metrics).map(([k,v]) =>
+      `<div class="metric-tile">
+         <div class="metric-tile__label">${escHtml(k)}</div>
+         <div class="metric-tile__value">${escHtml(String(v))}${typeof v==='number'?'<span class="metric-tile__unit">ms</span>':''}</div>
+       </div>`).join('');
+  }
+  let lhHtml = '';
+  if (ev.lhScore != null) {
+    const sc = Math.round(ev.lhScore);
+    const cls = sc >= 90 ? 'score-good' : sc >= 50 ? 'score-mid' : 'score-poor';
+    lhHtml = `<div class="lh-row" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border2);">
+      🔦 <span>Lighthouse Performance</span>
+      <span class="lh-score ${cls}">${sc}</span><span style="color:var(--muted)">/100</span>
+    </div>`;
+  }
+  const links = [
+    ev.htmlReport  && `<a class="report-btn report-btn-html"  href="${ev.htmlReport}"  target="_blank">📄 HTML Report</a>`,
+    ev.excelReport && `<a class="report-btn report-btn-excel" href="${ev.excelReport}" target="_blank">📊 Excel Report</a>`,
+    ev.lhReport    && `<a class="report-btn report-btn-lh"    href="${ev.lhReport}"    target="_blank">🔦 Lighthouse Report</a>`,
+  ].filter(Boolean).join('');
+
+  el.innerHTML = `
+    <div class="result-card__header">
+      <div>
+        <div class="result-card__name">${escHtml(ev.name ?? ev.url)}</div>
+        <div class="result-card__url">${escHtml(ev.url)}</div>
+      </div>
+      <span class="status-badge ${sCls}">${ev.overallStatus ?? 'N/A'}</span>
+    </div>
+    <div class="metrics-wrap">
+      <div class="metrics-tiles">${tiles}</div>
+      ${lhHtml}
+    </div>
+    ${links ? `<div class="report-links">${links}</div>` : ''}
+  `;
+  return el;
+}
+function statusCls(s) {
+  if (!s) return 'status-na';
+  const l = s.toLowerCase();
+  if (l === 'good') return 'status-good';
+  if (l.includes('needs') || l === 'moderate') return 'status-moderate';
+  if (l === 'poor') return 'status-poor';
+  return 'status-na';
+}
+
+function showAllDone(results) {
+  const htmlResults = results.filter(r => r.htmlReport);
+  if (results.length > 1 && htmlResults.length) {
+    const wrap = document.getElementById('combined-report-wrap');
+    wrap.style.display = 'block';
+    document.getElementById('combined-report-btn').href = htmlResults[htmlResults.length-1].htmlReport;
+  }
+}
+
+function resetForm() {
+  document.getElementById('results-section').style.display = 'none';
+  document.getElementById('progress-section').style.display = 'none';
+  document.getElementById('combined-report-wrap').style.display = 'none';
+  document.getElementById('results-cards').innerHTML = '';
+  document.getElementById('terminal').innerHTML = '';
+  setProgress(0);
+  routeEdits          = {};
+  credentialOverrides = null;
+  document.querySelector('.hero').scrollIntoView({ behavior:'smooth' });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Past reports
+// ─────────────────────────────────────────────────────────────────────────────
+async function loadPastReports() {
+  try {
+    const data = await fetch('/api/reports/list').then(r => r.json());
+    if (!data.length) return;
+    document.getElementById('past-grid').innerHTML = data.map(f => `
+      <div class="past-item">
+        <div>
+          <div class="past-item__name">${escHtml(f.name)}</div>
+          <div class="past-item__time">${new Date(f.mtime).toLocaleString()}</div>
+        </div>
+        <a class="report-btn report-btn-html" href="${f.url}" target="_blank"
+           style="font-size:.75rem;padding:5px 12px;">Open</a>
+      </div>`).join('');
+    document.getElementById('past-section-label').style.display = 'block';
+    document.getElementById('past-reports-card').style.display  = 'block';
+  } catch {}
+}
+
+loadPastReports();
+</script>
+</body>
+</html>

@@ -1,0 +1,48 @@
+- generic [ref=e46]:
+  - navigation [ref=e48]:
+    - list [ref=e49]:
+      - link "Perforce IPLM v2026.2.0 version (τ)" [ref=e51] [cursor=pointer]:
+        - /url: "#/home"
+        - img "Perforce IPLM v2026.2.0 version (τ)" [ref=e52]
+    - list [ref=e53]:
+      - listitem [ref=e54]:
+        - generic: Shopping cart
+      - listitem [ref=e55]:
+        - generic [ref=e56]:
+          - button "Administration " [ref=e57] [cursor=pointer]:
+            - generic [ref=e58]:
+              - text: Administration
+              - generic [ref=e60]: 
+          - text:   
+      - listitem [ref=e61]:
+        - generic [ref=e62]:
+          - button "Catalogs " [ref=e63] [cursor=pointer]:
+            - generic [ref=e64]:
+              - text: Catalogs
+              - generic [ref=e66]: 
+          - text:   
+      - listitem [ref=e67]:
+        - generic [ref=e68]:
+          - button "Create " [ref=e69] [cursor=pointer]:
+            - generic [ref=e70]:
+              - text: Create
+              - generic [ref=e72]: 
+          - text:   
+      - listitem [ref=e73]:
+        - generic [ref=e74]:
+          - button "admin " [ref=e75] [cursor=pointer]:
+            - generic [ref=e76]:
+              - text: admin
+              - generic [ref=e78]: 
+          - text:  
+  - search [ref=e183]:
+    - generic [ref=e83]: Advanced search
+  - status [ref=e187]
+  - generic [ref=e158]:
+    - generic [ref=e159]:
+      - generic [ref=e160]: 
+      - text: 2026 Perforce Software, Inc. All rights reserved. |
+    - generic [ref=e162]:
+      - text: Percipient
+      - link "Docs" [ref=e163] [cursor=pointer]:
+        - /url: https://docs.methodics.com/
