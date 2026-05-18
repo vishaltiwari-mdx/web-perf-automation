@@ -11,6 +11,18 @@ import * as LogManager from '../utils/LogManager';
 let reportPath    = '';
 let reportSections: string[] = [];
 
+// When non-null, only these metric keys (e.g. ['LCP','CLS','API']) appear in
+// the report. When null, the full set is rendered (default behavior).
+let selectedMetrics: Set<string> | null = null;
+
+export function setSelectedMetrics(keys: string[] | null): void {
+  selectedMetrics = keys && keys.length ? new Set(keys.map(k => k.toUpperCase())) : null;
+}
+
+function isMetricSelected(key: string): boolean {
+  return !selectedMetrics || selectedMetrics.has(key);
+}
+
 function timestamp(): string {
   return new Date().toISOString().replace(/T/, ' ').replace(/\..+/, '');
 }
@@ -94,7 +106,7 @@ export function addMetricsNoScreenshot(testName: string, metrics: PerformanceMet
 
 export function addSummaryTable(metricsList: PerformanceMetrics[]): void {
   reportSections.push(buildSummaryTable(metricsList));
-  reportSections.push(buildBenchmarkReference());
+  if (!selectedMetrics) reportSections.push(buildBenchmarkReference());
 }
 
 export function flush(): void {
@@ -114,16 +126,21 @@ export function flush(): void {
 // ── Table builders ─────────────────────────────────────────────────────────────
 
 function buildCoreWebVitalsTable(m: PerformanceMetrics): string {
+  const rows: Array<[string, string]> = [
+    ['LCP',  row('LCP (Largest Contentful Paint)',  fmt(m.largestContentfulPaint) + ' ms', '&le; 2500 ms', m.lcpStatus)],
+    ['FCP',  row('FCP (First Contentful Paint)',    fmt(m.firstContentfulPaint)   + ' ms', '&le; 1800 ms', m.fcpStatus)],
+    ['TTI',  row('TTI (Time to Interactive)',       fmt(m.timeToInteractive)       + ' ms', '&le; 3800 ms', m.ttiStatus)],
+    ['CLS',  row('CLS (Cumulative Layout Shift)',   m.cumulativeLayoutShift.toFixed(4),    '&le; 0.1',     m.clsStatus)],
+    ['TTFB', row('TTFB (Time to First Byte)',       fmt(m.timeToFirstByte)        + ' ms', '&le; 800 ms',  m.ttfbStatus)],
+    ['INP',  row('INP (Interaction to Next Paint)', fmt(m.interactionToNextPaint) + ' ms', '&le; 200 ms', 'INFO')],
+    ['TBT',  row('TBT (Total Blocking Time)',       fmt(m.totalBlockingTime)       + ' ms', '&le; 200 ms', 'INFO')],
+  ];
+  const visible = rows.filter(([k]) => isMetricSelected(k));
+  if (visible.length === 0) return '';
   return `<h4>Core Web Vitals</h4>
   <table>
     <tr class="th-row"><th>Metric</th><th>Value</th><th>Target</th><th>Status</th></tr>
-    ${row('LCP (Largest Contentful Paint)', fmt(m.largestContentfulPaint) + ' ms', '&le; 2500 ms', m.lcpStatus)}
-    ${row('FCP (First Contentful Paint)',   fmt(m.firstContentfulPaint)   + ' ms', '&le; 1800 ms', m.fcpStatus)}
-    ${row('TTI (Time to Interactive)',      fmt(m.timeToInteractive)       + ' ms', '&le; 3800 ms', m.ttiStatus)}
-    ${row('CLS (Cumulative Layout Shift)',  m.cumulativeLayoutShift.toFixed(4),    '&le; 0.1',     m.clsStatus)}
-    ${row('TTFB (Time to First Byte)',      fmt(m.timeToFirstByte)        + ' ms', '&le; 800 ms',  m.ttfbStatus)}
-    ${row('INP (Interaction to Next Paint)', fmt(m.interactionToNextPaint) + ' ms', '&le; 200 ms', 'INFO')}
-    ${row('TBT (Total Blocking Time)',      fmt(m.totalBlockingTime)       + ' ms', '&le; 200 ms', 'INFO')}
+    ${visible.map(([, html]) => html).join('\n')}
   </table>`;
 }
 
@@ -132,27 +149,36 @@ function buildNavigationTimingTable(m: PerformanceMetrics): string {
     ? highlightRow('AG-Grid Spinner Time', fmt(m.agGridLoadTime) + ' ms',
         m.agGridLoadTime < 1000 ? '#1a3a1a' : m.agGridLoadTime < 3000 ? '#3a3a1a' : '#3a1a1a')
     : infoRow('AG-Grid Spinner Time', 'N/A (no grid on this page)');
+
+  // ['<key>', '<html>', <whether to keep when no filter group matches>]
+  //   keyless rows ('') are only shown in unfiltered (default) mode
+  const rows: Array<[string, string]> = [
+    ['DNS', infoRow('DNS Lookup Time',     fmt(m.dnsLookupTime)      + ' ms')],
+    ['TCP', infoRow('TCP Connection Time', fmt(m.tcpConnectionTime)  + ' ms')],
+    ['',    infoRow('Redirect Time',       fmt(m.redirectTime)       + ' ms')],
+    ['',    infoRow('Request Time',        fmt(m.requestTime)        + ' ms')],
+    ['',    infoRow('Response Time',       fmt(m.responseTime)       + ' ms')],
+    ['',    infoRow('DOM Interactive',     fmt(m.domInteractiveTime) + ' ms')],
+    ['DCL', infoRow('DOM Content Loaded',  fmt(m.domContentLoadedTime) + ' ms')],
+    ['PLT', infoRow('Full Page Load',      fmt(m.pageLoadTime)       + ' ms')],
+    ['AGG', agGridRow],
+    ['',    m.actionToLoadMs > 0
+              ? highlightRow('Action → Page Ready', fmt(m.actionToLoadMs) + ' ms',
+                  m.actionToLoadMs < 3000 ? '#1a2a3a' : m.actionToLoadMs < 8000 ? '#3a3a1a' : '#3a1a1a')
+              : infoRow('Action → Page Ready', 'N/A')],
+  ];
+  const visible = rows.filter(([k]) => k ? isMetricSelected(k) : !selectedMetrics);
+  if (visible.length === 0) return '';
   return `<h4>Navigation Timing</h4>
   <table>
     <tr class="th-row"><th>Metric</th><th>Value</th></tr>
-    ${infoRow('DNS Lookup Time',     fmt(m.dnsLookupTime)      + ' ms')}
-    ${infoRow('TCP Connection Time', fmt(m.tcpConnectionTime)  + ' ms')}
-    ${infoRow('Redirect Time',       fmt(m.redirectTime)       + ' ms')}
-    ${infoRow('Request Time',        fmt(m.requestTime)        + ' ms')}
-    ${infoRow('Response Time',       fmt(m.responseTime)       + ' ms')}
-    ${infoRow('DOM Interactive',     fmt(m.domInteractiveTime) + ' ms')}
-    ${infoRow('DOM Content Loaded',  fmt(m.domContentLoadedTime) + ' ms')}
-    ${infoRow('Full Page Load',      fmt(m.pageLoadTime)       + ' ms')}
-    ${agGridRow}
-    ${m.actionToLoadMs > 0
-      ? highlightRow('Action → Page Ready',
-          fmt(m.actionToLoadMs) + ' ms',
-          m.actionToLoadMs < 3000 ? '#1a2a3a' : m.actionToLoadMs < 8000 ? '#3a3a1a' : '#3a1a1a')
-      : infoRow('Action → Page Ready', 'N/A')}
+    ${visible.map(([, html]) => html).join('\n')}
   </table>`;
 }
 
 function buildResourceTable(m: PerformanceMetrics): string {
+  // Resource Summary has no metric-pill equivalent — hide it entirely in custom mode
+  if (selectedMetrics) return '';
   const sizeKb = Math.round(m.transferSize / 1024);
   return `<h4>Resource Summary</h4>
   <table>
@@ -163,6 +189,7 @@ function buildResourceTable(m: PerformanceMetrics): string {
 }
 
 function buildSlowApiRequestsTable(m: PerformanceMetrics): string {
+  if (!isMetricSelected('API')) return '';
   const slowApis: ApiRequestMetric[] = m.slowApiRequests ?? [];
   if (slowApis.length === 0) {
     return `<h4>Slow API Requests (&gt; 1 second)</h4>
@@ -186,34 +213,50 @@ function buildSlowApiRequestsTable(m: PerformanceMetrics): string {
 }
 
 function buildSummaryTable(list: PerformanceMetrics[]): string {
-  let rows = '';
-  list.forEach(m => {
+  // Column config: [pill-key | '_always', <header html>, <cell renderer>]
+  //   '_always' columns (Page, Overall) are never filtered.
+  type Col = ['_always' | string, string, (m: PerformanceMetrics) => string];
+  const cols: Col[] = [
+    ['_always', 'Page',             m => `<td>${esc(m.pageName)}</td>`],
+    ['PLT',    'Load Time',         m => `<td>${fmt(m.pageLoadTime)} ms</td>`],
+    ['FCP',    'FCP',               m => `<td>${fmt(m.firstContentfulPaint)} ms</td>`],
+    ['LCP',    'LCP',               m => `<td>${fmt(m.largestContentfulPaint)} ms</td>`],
+    ['TTI',    'TTI',               m => `<td>${fmt(m.timeToInteractive)} ms</td>`],
+    ['CLS',    'CLS',               m => `<td>${m.cumulativeLayoutShift.toFixed(3)}</td>`],
+    ['TTFB',   'TTFB',              m => `<td>${fmt(m.timeToFirstByte)} ms</td>`],
+    ['TBT',    'TBT',               m => `<td>${fmt(m.totalBlockingTime)} ms</td>`],
+    ['INP',    'INP',               m => `<td>${fmt(m.interactionToNextPaint)} ms</td>`],
+    ['DNS',    'DNS',               m => `<td>${fmt(m.dnsLookupTime)} ms</td>`],
+    ['TCP',    'TCP',               m => `<td>${fmt(m.tcpConnectionTime)} ms</td>`],
+    ['DCL',    'DCL',               m => `<td>${fmt(m.domContentLoadedTime)} ms</td>`],
+    ['AGG',    'AG-Grid',           m => `<td>${m.agGridLoadTime > 0 ? fmt(m.agGridLoadTime) + ' ms' : '&mdash;'}</td>`],
+    ['API',    'Slow APIs (&gt;1s)', m => {
+      const c  = (m.slowApiRequests ?? []).length;
+      const bg = c === 0 ? '#1a3a1a' : c <= 2 ? '#3a3a1a' : '#3a1a1a';
+      return `<td style="background:${bg};font-weight:bold">${c === 0 ? '&mdash;' : c}</td>`;
+    }],
+    // Resources / Transfer have no pill — only shown when unfiltered
+    ['_resources', 'Resources', m => `<td>${m.totalResources}</td>`],
+    ['_resources', 'Transfer',  m => `<td>${Math.round(m.transferSize / 1024)} KB</td>`],
+    ['_always',    'Overall',   m => `<td><b>${m.overallStatus}</b></td>`],
+  ];
+
+  const visible = cols.filter(([k]) =>
+    k === '_always' ? true :
+    k === '_resources' ? !selectedMetrics :
+    isMetricSelected(k),
+  );
+
+  const header = visible.map(([, h]) => `<th>${h}</th>`).join('');
+  const rows   = list.map(m => {
     const bg = m.overallStatus === 'GOOD' ? '#1a3a1a' : m.overallStatus === 'POOR' ? '#3a1a1a' : '#3a3a1a';
-    const slowCount = (m.slowApiRequests ?? []).length;
-    const slowBg    = slowCount === 0 ? '#1a3a1a' : slowCount <= 2 ? '#3a3a1a' : '#3a1a1a';
-    rows += `<tr style="background:${bg};text-align:center">
-      <td>${esc(m.pageName)}</td>
-      <td>${fmt(m.pageLoadTime)} ms</td>
-      <td>${fmt(m.firstContentfulPaint)} ms</td>
-      <td>${fmt(m.largestContentfulPaint)} ms</td>
-      <td>${fmt(m.timeToInteractive)} ms</td>
-      <td>${m.cumulativeLayoutShift.toFixed(3)}</td>
-      <td>${fmt(m.timeToFirstByte)} ms</td>
-      <td>${m.agGridLoadTime > 0 ? fmt(m.agGridLoadTime) + ' ms' : '&mdash;'}</td>
-      <td style="background:${slowBg};font-weight:bold">${slowCount === 0 ? '&mdash;' : slowCount}</td>
-      <td>${m.totalResources}</td>
-      <td>${Math.round(m.transferSize / 1024)} KB</td>
-      <td><b>${m.overallStatus}</b></td>
-    </tr>`;
-  });
+    return `<tr style="background:${bg};text-align:center">${visible.map(([, , render]) => render(m)).join('')}</tr>`;
+  }).join('');
+
   return `<section class="test-section">
   <h3>Performance Summary — All Pages</h3>
   <table style="font-size:13px">
-    <tr class="th-row" style="background:#1a1a2e;text-align:center">
-      <th>Page</th><th>Load Time</th><th>FCP</th><th>LCP</th><th>TTI</th>
-      <th>CLS</th><th>TTFB</th><th>AG-Grid</th><th>Slow APIs (&gt;1s)</th>
-      <th>Resources</th><th>Transfer</th><th>Overall</th>
-    </tr>
+    <tr class="th-row" style="background:#1a1a2e;text-align:center">${header}</tr>
     ${rows}
   </table>
   </section>`;

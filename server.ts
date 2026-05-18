@@ -104,12 +104,19 @@ app.post('/api/analyze', async (req: Request, res: Response) => {
     });
   }
 
-  const { urls = [], metricsType = 'both', flow = '', credentials } = req.body as {
+  const { urls = [], metricsType = 'both', flow = '', selectedMetrics = [], credentials } = req.body as {
     urls: string[];
-    metricsType: 'playwright' | 'lighthouse' | 'both';
+    metricsType: 'playwright' | 'lighthouse' | 'both' | 'custom';
     flow: string;
+    selectedMetrics?: string[];
     credentials?: { username: string; password: string };
   };
+
+  if (metricsType === 'custom' && (!selectedMetrics || selectedMetrics.length === 0)) {
+    return void res.status(400).json({
+      error: 'Custom analysis requires at least one selected metric.',
+    });
+  }
 
   const cleanUrls = urls.map((u: string) => u.trim()).filter(Boolean);
   if (!cleanUrls.length) {
@@ -189,7 +196,7 @@ app.post('/api/analyze', async (req: Request, res: Response) => {
     emit({ t: 'log', lvl: 'info', msg: `[Server] Project: dynamic | URLs: ${targetUrls.length}` });
     emit({ t: 'log', lvl: 'info', msg: `[Server] Navigation Plan: ${NavigationAgent.ROUTES_FILE}` });
 
-    const results = await spawnPlaywright(targetUrls, batchId, metricsType, credentials, emit);
+    const results = await spawnPlaywright(targetUrls, batchId, metricsType, selectedMetrics ?? [], credentials, emit);
 
     results.forEach(r => emit({ t: 'url_done', ...r }));
     emit({ t: 'complete', results });
@@ -205,22 +212,23 @@ app.post('/api/analyze', async (req: Request, res: Response) => {
 // ── Playwright spawn helper ────────────────────────────────────────────────────
 
 function spawnPlaywright(
-  urls:        string[],
-  batchId:     string,
-  metricsType: 'playwright' | 'both',
-  credentials: { username: string; password: string } | undefined,
-  emit:        (data: object) => void,
+  urls:            string[],
+  batchId:         string,
+  metricsType:     'playwright' | 'both' | 'custom',
+  selectedMetrics: string[],
+  credentials:     { username: string; password: string } | undefined,
+  emit:            (data: object) => void,
 ): Promise<ResultEntry[]> {
   return new Promise((resolve, reject) => {
     const env: NodeJS.ProcessEnv = {
       ...process.env,
-      TARGET_URLS:  urls.join(','),
-      BATCH_ID:     batchId,
-      METRICS_TYPE: metricsType,
+      TARGET_URLS:      urls.join(','),
+      BATCH_ID:         batchId,
+      METRICS_TYPE:     metricsType,
+      ...(selectedMetrics.length ? { SELECTED_METRICS: selectedMetrics.join(',') } : {}),
       ...(credentials?.username ? { TEST_USERNAME: credentials.username } : {}),
       ...(credentials?.password ? { TEST_PASSWORD: credentials.password } : {}),
-      // Keep colour output disabled so log lines are clean
-      FORCE_COLOR:  '0',
+      FORCE_COLOR:      '0',
     };
 
     // Use npx playwright so it resolves from node_modules regardless of global installs

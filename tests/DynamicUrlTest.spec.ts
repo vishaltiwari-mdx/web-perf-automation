@@ -52,13 +52,17 @@ test.beforeAll(async () => {
   const reportDir = config.getReportPath();
 
   LogManager.init(reportDir);
-  // Individual HtmlReports are initialised per-URL inside the test body;
-  // we do NOT call HtmlReportManager.init() here.
+
+  // Custom metric selection — comma-separated keys (e.g. "LCP,CLS,API")
+  const selected = (process.env['SELECTED_METRICS'] ?? '')
+    .split(',').map(s => s.trim()).filter(Boolean);
+  HtmlReportManager.setSelectedMetrics(selected.length ? selected : null);
 
   console.info('[DynamicUrlTest] ══ Worker initialised ════════════════════════');
-  console.info(`[DynamicUrlTest] TARGET_URLS  : ${process.env['TARGET_URLS'] ?? '(none)'}`);
-  console.info(`[DynamicUrlTest] METRICS_TYPE : ${process.env['METRICS_TYPE'] ?? 'both (default)'}`);
-  console.info(`[DynamicUrlTest] BATCH_ID     : ${process.env['BATCH_ID'] ?? '(none)'}`);
+  console.info(`[DynamicUrlTest] TARGET_URLS      : ${process.env['TARGET_URLS'] ?? '(none)'}`);
+  console.info(`[DynamicUrlTest] METRICS_TYPE     : ${process.env['METRICS_TYPE'] ?? 'both (default)'}`);
+  console.info(`[DynamicUrlTest] SELECTED_METRICS : ${selected.length ? selected.join(', ') : '(all)'}`);
+  console.info(`[DynamicUrlTest] BATCH_ID         : ${process.env['BATCH_ID'] ?? '(none)'}`);
 });
 
 test.afterAll(async () => {
@@ -138,7 +142,7 @@ test.afterAll(async () => {
 test('Dynamic URL Performance', async () => {
   const config      = ConfigReader.getInstance();
   const rawUrls     = (process.env['TARGET_URLS'] ?? '').split(',').map(u => u.trim()).filter(Boolean);
-  const metricsType = (process.env['METRICS_TYPE'] ?? 'both') as 'playwright' | 'both';
+  const metricsType = (process.env['METRICS_TYPE'] ?? 'both') as 'playwright' | 'both' | 'custom';
   const testUser    = process.env['TEST_USERNAME'] ?? config.getUsername();
   const testPass    = process.env['TEST_PASSWORD'] ?? config.getPassword();
   const timeoutMs   = config.getPageLoadTimeout() * 1000;

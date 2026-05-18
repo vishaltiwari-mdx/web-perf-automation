@@ -35,8 +35,8 @@ Source: analysis of `phi_web_automation` repo
 ## ip/catalog
 > IP Catalog — Catalogs ▸ IP catalog
 
-1. css: `div[data-testid='ui-dropdown-menu-catalog'] > button` — Open Catalogs dropdown
-2. xpath: `//li[contains(@class,'ip-catalog')]//span[normalize-space()='IP catalog']` — Click IP Catalog item
+1. css: `css: div[data-testid='ui-dropdown-menu-catalog'] > button` — Open Catalogs dropdown
+2. css: `xpath: //li[contains(@class,'ip-catalog')]//span[normalize-space()='IP catalog'] — Click IP Catalog item` — 
 
 ---
 
