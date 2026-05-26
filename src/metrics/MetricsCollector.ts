@@ -210,7 +210,7 @@ export class MetricsCollector {
   // ── Slow API Requests ────────────────────────────────────────────────────────
 
   private async collectSlowApiRequests(metrics: PerformanceMetrics): Promise<void> {
-    const THRESHOLD = 1000;
+    const THRESHOLD = 300;
     try {
       const raw = await this.page.evaluate(`
         var threshold = ${THRESHOLD};

@@ -156,14 +156,14 @@ export class ExcelReportManager {
     });
 
     // ── Sheet 3: Slow API Requests ────────────────────────────────────────────
-    const sheet3 = wb.addWorksheet('Slow API Requests (>1s)');
+    const sheet3 = wb.addWorksheet('Slow API Requests (>300ms)');
     sheet3.getColumn(1).width = 22;
     sheet3.getColumn(2).width = 60;
     sheet3.getColumn(3).width = 16;
     sheet3.getColumn(4).width = 16;
 
     const apiTitle = sheet3.addRow([
-      `Slow API Requests (duration >= 1 000 ms) — Generated: ${new Date().toLocaleString()}`,
+      `Slow API Requests (duration >= 300 ms) — Generated: ${new Date().toLocaleString()}`,
     ]);
     sheet3.mergeCells(apiTitle.number, 1, apiTitle.number, 4);
     applyTitleStyle(apiTitle.getCell(1));
@@ -174,7 +174,7 @@ export class ExcelReportManager {
     });
 
     if (allSlow.length === 0) {
-      const noData = sheet3.addRow(['No API requests exceeded 1 000 ms on any measured page.']);
+      const noData = sheet3.addRow(['No API requests exceeded 300 ms on any measured page.']);
       sheet3.mergeCells(noData.number, 1, noData.number, 4);
       applyColorCell(noData.getCell(1), COLOR_GOOD);
     } else {

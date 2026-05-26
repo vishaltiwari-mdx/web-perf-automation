@@ -51,7 +51,7 @@ export interface PerformanceMetrics {
    */
   actionToLoadMs: number;
 
-  // Slow API requests (>= 1 000 ms)
+  // Slow API requests (>= 300 ms)
   slowApiRequests: ApiRequestMetric[];
 
   // Benchmark statuses

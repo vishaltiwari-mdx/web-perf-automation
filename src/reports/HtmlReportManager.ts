@@ -192,12 +192,12 @@ function buildSlowApiRequestsTable(m: PerformanceMetrics): string {
   if (!isMetricSelected('API')) return '';
   const slowApis: ApiRequestMetric[] = m.slowApiRequests ?? [];
   if (slowApis.length === 0) {
-    return `<h4>Slow API Requests (&gt; 1 second)</h4>
-    <p style="color:#888;margin:4px 0">No API requests exceeded 1 second on this page.</p>`;
+    return `<h4>Slow API Requests (&gt; 300 ms)</h4>
+    <p style="color:#888;margin:4px 0">No API requests exceeded 300 ms on this page.</p>`;
   }
   let rows = '';
   slowApis.forEach((api, i) => {
-    const bg = api.durationMs >= 5000 ? '#5a0a0a' : api.durationMs >= 3000 ? '#3a1a1a' : '#3a2a1a';
+    const bg = api.durationMs >= 3000 ? '#5a0a0a' : api.durationMs >= 1000 ? '#3a1a1a' : '#3a2a1a';
     rows += `<tr style="background:${bg}">
       <td style="text-align:center">${i + 1}</td>
       <td style="word-break:break-all;font-size:12px">${esc(api.url)}</td>
@@ -205,7 +205,7 @@ function buildSlowApiRequestsTable(m: PerformanceMetrics): string {
       <td style="text-align:center">${esc(api.type)}</td>
     </tr>`;
   });
-  return `<h4>Slow API Requests (&gt; 1 second) &nbsp;<span style="color:#ff6b6b;font-size:13px">${slowApis.length} found</span></h4>
+  return `<h4>Slow API Requests (&gt; 300 ms) &nbsp;<span style="color:#ff6b6b;font-size:13px">${slowApis.length} found</span></h4>
   <table>
     <tr class="th-row" style="background:#3a1a1a"><th>#</th><th>API URL</th><th>Duration</th><th>Type</th></tr>
     ${rows}
@@ -230,7 +230,7 @@ function buildSummaryTable(list: PerformanceMetrics[]): string {
     ['TCP',    'TCP',               m => `<td>${fmt(m.tcpConnectionTime)} ms</td>`],
     ['DCL',    'DCL',               m => `<td>${fmt(m.domContentLoadedTime)} ms</td>`],
     ['AGG',    'AG-Grid',           m => `<td>${m.agGridLoadTime > 0 ? fmt(m.agGridLoadTime) + ' ms' : '&mdash;'}</td>`],
-    ['API',    'Slow APIs (&gt;1s)', m => {
+    ['API',    'Slow APIs (&gt;300ms)', m => {
       const c  = (m.slowApiRequests ?? []).length;
       const bg = c === 0 ? '#1a3a1a' : c <= 2 ? '#3a3a1a' : '#3a1a1a';
       return `<td style="background:${bg};font-weight:bold">${c === 0 ? '&mdash;' : c}</td>`;
