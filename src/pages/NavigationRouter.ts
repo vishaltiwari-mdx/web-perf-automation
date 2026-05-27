@@ -51,7 +51,21 @@ export class NavigationRouter {
     this.clickActions.set(key(pathOrSegment), action);
   }
 
+  /** Cached value snapshotted right after dispatch() — kept for back-compat. */
   getLastAgGridLoadTime(): number {
+    return this.lastAgGridLoadTimeMs;
+  }
+
+  /**
+   * Live re-read from the page's MutationObserver. Call this AFTER the
+   * metrics collector has finished waiting for the page to be fully ready,
+   * so the spinner has had time to disappear and accumulate its full duration.
+   */
+  async readAgGridLoadTimeLive(): Promise<number> {
+    const ms = await this.readAgGridLoadTime();
+    if (ms > this.lastAgGridLoadTimeMs) {
+      this.lastAgGridLoadTimeMs = ms;
+    }
     return this.lastAgGridLoadTimeMs;
   }
 
@@ -317,16 +331,20 @@ export class NavigationRouter {
   }
 
   private async waitForAgGridSpinner(): Promise<void> {
+    // AG-Grid emits multiple overlay variants depending on theme/version:
+    //   .ag-overlay-loading-wrapper   — standard wrapper
+    //   .ag-overlay-loading-center    — centre overlay text
+    //   .ag-loading-text              — Helix custom overlay
     const spinner = this.page.locator(
-      "xpath=//span[contains(@class,'ag-loading-text') and normalize-space()='Loading']",
+      '.ag-overlay-loading-wrapper, .ag-overlay-loading-center, .ag-loading-text',
     );
     try {
-      const appeared = await spinner
-        .waitFor({ state: 'visible', timeout: 2_000 })
+      const appeared = await spinner.first()
+        .waitFor({ state: 'visible', timeout: 5_000 })
         .then(() => true)
         .catch(() => false);
       if (appeared) {
-        await spinner.waitFor({ state: 'hidden', timeout: 15_000 });
+        await spinner.first().waitFor({ state: 'hidden', timeout: 30_000 });
       }
     } catch { /* spinner already gone */ }
   }
@@ -359,11 +377,13 @@ export class NavigationRouter {
           (window as any).__agGridSpinnerObs.disconnect();
         }
 
+        const SPINNER_SELECTOR =
+          '.ag-overlay-loading-wrapper, .ag-overlay-loading-center, .ag-loading-text';
+
         const obs = new MutationObserver(() => {
-          const els = document.querySelectorAll('.ag-loading-text');
+          const els = document.querySelectorAll(SPINNER_SELECTOR);
           const visible = Array.from(els).some(
-            el => (el as HTMLElement).offsetParent !== null
-               && el.textContent?.trim() === 'Loading',
+            el => (el as HTMLElement).offsetParent !== null,
           );
           if (visible && !(window as any).__agGridSpinnerStart) {
             (window as any).__agGridSpinnerStart = Date.now();

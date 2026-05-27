@@ -205,7 +205,9 @@ test('Dynamic URL Performance', async () => {
 
       // Collect Playwright metrics
       const metrics = await collector.collect(pageName);
-      metrics.agGridLoadTime  = router.getLastAgGridLoadTime();
+      // Re-read AG-Grid spinner time AFTER collect()'s settle wait — the spinner
+      // typically finishes during that window, so the cached value is stale.
+      metrics.agGridLoadTime  = await router.readAgGridLoadTimeLive();
       metrics.actionToLoadMs  = router.getLastActionToLoadTime();
 
       // Optional Lighthouse audit (runs its own Chrome — no port conflict)

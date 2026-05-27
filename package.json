@@ -8,6 +8,8 @@
     "test:helix": "playwright test --project=helix-pages",
     "test:analyze": "playwright test --project=analyzer",
     "analyze": "ts-node src/agent/PageLoadAnalyzerRunner.ts",
+    "analyze:file": "ts-node src/agent/PageLoadAnalyzerRunner.ts --file",
+    "analyze:urls": "ts-node src/agent/PageLoadAnalyzerRunner.ts --urls",
     "mcp": "ts-node mcp-server.ts",
     "typecheck": "tsc --noEmit",
     "allure:generate": "allure generate reports/allure-results --clean -o reports/allure-report",

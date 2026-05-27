@@ -1,4 +1,4 @@
-import { Page } from '@playwright/test';
+import { Page, Request } from '@playwright/test';
 import {
   PerformanceMetrics,
   createEmptyMetrics,
@@ -53,22 +53,84 @@ const WEB_VITALS_SCRIPT = `
  *   await router.navigateAndPrepare(url);
  *   const metrics = await collector.collect('My Page');
  */
+interface TrackedRequest {
+  url:          string;
+  resourceType: string;   // 'xhr' | 'fetch' | 'document' | 'script' | 'stylesheet' | ...
+  durationMs:   number;
+  transferSize: number;
+}
+
 export class MetricsCollector {
   private page: Page;
   private config: ConfigReader;
+  // Playwright-tracked network responses — populated regardless of whether the
+  // SPA calls performance.clearResourceTimings(). Source of truth for the
+  // Resource Summary and Slow API Requests tables.
+  private trackedRequests: TrackedRequest[] = [];
+  // Wall-clock fallback: Playwright's request.timing() returns -1 for cached
+  // / 304 responses on many builds. We start our own timer on 'request' and
+  // close it on 'response' so we always have a duration.
+  private requestStartedAt: Map<Request, number> = new Map();
 
   constructor(page: Page) {
     this.page = page;
     this.config = ConfigReader.getInstance();
-    // Also register as init-script so the observer fires even on full page reloads.
     page.addInitScript(WEB_VITALS_SCRIPT).catch(() => {});
+
+    page.on('request', (req) => {
+      this.requestStartedAt.set(req, Date.now());
+    });
+
+    // Push synchronously on 'response' (early, reliable). Helix SPAs clear
+    // performance.getEntriesByType('resource'), so we MUST capture via
+    // Playwright events instead — those happen out-of-process.
+    page.on('response', (resp) => {
+      const req     = resp.request();
+      const startTs = this.requestStartedAt.get(req) ?? Date.now();
+      let durationMs = Math.max(0, Date.now() - startTs);
+
+      // Prefer Playwright's precise timing when available
+      try {
+        const t = req.timing();
+        if (t && t.responseEnd >= 0 && t.startTime >= 0 && t.responseEnd > t.startTime) {
+          durationMs = t.responseEnd - t.startTime;
+        }
+      } catch { /* timing not available — keep wall-clock fallback */ }
+
+      // Transfer size from Content-Length header (fast, sync-ish). We don't
+      // call resp.body() / req.sizes() here because those can stall the
+      // event queue for large responses.
+      let transferSize = 0;
+      try {
+        const cl = resp.headers()['content-length'];
+        if (cl) transferSize = parseInt(cl, 10) || 0;
+      } catch { /* headers not available */ }
+
+      this.trackedRequests.push({
+        url:          req.url(),
+        resourceType: req.resourceType(),
+        durationMs,
+        transferSize,
+      });
+      this.requestStartedAt.delete(req);
+    });
+
+    page.on('requestfailed', (req) => {
+      this.requestStartedAt.delete(req);
+    });
   }
 
   /**
    * Injects the Web Vitals PerformanceObserver into the current page context.
    * Call this BEFORE navigation so LCP/CLS events are captured from first paint.
+   *
+   * Also resets the network tracker so the upcoming navigation starts from a
+   * clean slate — only resources fetched by the TARGET page are counted, not
+   * the login flow that preceded it.
    */
   async injectWebVitalsObserver(): Promise<void> {
+    this.trackedRequests = [];
+    this.requestStartedAt.clear();
     try {
       await this.page.evaluate(WEB_VITALS_SCRIPT);
     } catch (e) {
@@ -193,47 +255,44 @@ export class MetricsCollector {
   }
 
   // ── Resource Metrics ─────────────────────────────────────────────────────────
+  // Source of truth: trackedRequests (Playwright network events), NOT the
+  // in-page performance.getEntriesByType('resource') buffer — SPAs frequently
+  // clear that buffer between grid renders.
 
   private async collectResourceMetrics(metrics: PerformanceMetrics): Promise<void> {
-    try {
-      const res = await this.page.evaluate(`
-        const resources = performance.getEntriesByType('resource');
-        let totalSize = 0;
-        resources.forEach(r => { totalSize += (r.transferSize || 0); });
-        return { count: resources.length, size: totalSize };
-      `) as { count: number; size: number };
-      metrics.totalResources = res.count || 0;
-      metrics.transferSize   = res.size  || 0;
-    } catch {}
+    metrics.totalResources = this.trackedRequests.length;
+    metrics.transferSize   = this.trackedRequests.reduce((sum, r) => sum + (r.transferSize || 0), 0);
+
+    const byType = this.trackedRequests.reduce<Record<string, number>>((acc, r) => {
+      acc[r.resourceType] = (acc[r.resourceType] ?? 0) + 1;
+      return acc;
+    }, {});
+    console.info(`[MetricsCollector] tracked ${this.trackedRequests.length} request(s) — ${
+      Object.entries(byType).map(([k, v]) => `${k}=${v}`).join(', ') || 'none'
+    }`);
   }
 
   // ── Slow API Requests ────────────────────────────────────────────────────────
 
   private async collectSlowApiRequests(metrics: PerformanceMetrics): Promise<void> {
     const THRESHOLD = 300;
-    try {
-      const raw = await this.page.evaluate(`
-        var threshold = ${THRESHOLD};
-        var resources = performance.getEntriesByType('resource');
-        var slow = [];
-        resources.forEach(function(r) {
-          if ((r.initiatorType === 'xmlhttprequest' || r.initiatorType === 'fetch')
-              && r.duration >= threshold) {
-            slow.push({ url: r.name, duration: r.duration, type: r.initiatorType });
-          }
-        });
-        slow.sort(function(a, b) { return b.duration - a.duration; });
-        return slow;
-      `) as Array<{ url: string; duration: number; type: string }>;
+    const apis = this.trackedRequests.filter(
+      r => r.resourceType === 'xhr' || r.resourceType === 'fetch',
+    );
+    const slow = apis
+      .filter(r => r.durationMs >= THRESHOLD)
+      .sort((a, b) => b.durationMs - a.durationMs);
 
-      if (raw && raw.length > 0) {
-        metrics.slowApiRequests = raw.map(r => ({
-          url:        String(r.url),
-          durationMs: Number(r.duration),
-          type:       String(r.type),
-        }));
-      }
-    } catch {}
+    metrics.slowApiRequests = slow.map(r => ({
+      url:        r.url,
+      durationMs: r.durationMs,
+      type:       r.resourceType === 'fetch' ? 'fetch' : 'xmlhttprequest',
+    }));
+
+    console.info(`[MetricsCollector] api calls: ${apis.length} total, ${slow.length} slow (>= ${THRESHOLD} ms)`);
+    if (slow.length > 0) {
+      console.info(`[MetricsCollector] slowest: ${Math.round(slow[0].durationMs)} ms — ${slow[0].url}`);
+    }
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -242,7 +301,30 @@ export class MetricsCollector {
     try {
       await this.page.waitForFunction(() => document.readyState === 'complete', { timeout: 30_000 });
     } catch {}
-    // Extra wait for LCP/CLS observers to settle (mirrors Java Thread.sleep(1500))
-    await this.page.waitForTimeout(1500);
+
+    // ── Wait for AG-Grid loading overlay to disappear (if present) ─────────────
+    // The overlay is visible while the grid fetches its rows via XHR. Without
+    // this wait we'd capture metrics mid-load and see 0 resources / 0 slow APIs.
+    try {
+      await this.page.waitForFunction(
+        () => {
+          const els = document.querySelectorAll(
+            '.ag-overlay-loading-wrapper, .ag-overlay-loading-center, .ag-loading-text',
+          );
+          return !Array.from(els).some(el => (el as HTMLElement).offsetParent !== null);
+        },
+        { timeout: 30_000 },
+      );
+    } catch { /* no grid or overlay still visible — continue */ }
+
+    // ── Wait for network to be quiet (no in-flight requests for ~500 ms) ──────
+    // Playwright's 'networkidle' is more reliable than polling the in-page
+    // resource buffer, which the Helix SPA clears on every grid render.
+    try {
+      await this.page.waitForLoadState('networkidle', { timeout: 15_000 });
+    } catch { /* still active or timed out — continue */ }
+
+    // Final small buffer for LCP/CLS observers to flush
+    await this.page.waitForTimeout(500);
   }
 }

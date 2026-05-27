@@ -11,8 +11,11 @@ import express, { Request, Response } from 'express';
 import * as path   from 'path';
 import * as fs     from 'fs';
 import { spawn, exec } from 'child_process';
-import { LighthouseCollector } from './src/metrics/LighthouseCollector';
+import { LighthouseCollector, LighthouseCookie } from './src/metrics/LighthouseCollector';
 import { NavigationAgent }     from './src/agent/NavigationAgent';
+import { ConfigReader }        from './src/config/ConfigReader';
+import { BrowserManager }      from './src/driver/BrowserManager';
+import { LoginPage }           from './src/pages/LoginPage';
 
 const app  = express();
 const PORT = parseInt(process.env['PORT'] ?? '4000', 10);
@@ -165,8 +168,13 @@ app.post('/api/analyze', async (req: Request, res: Response) => {
       emit({ t: 'url_start', url, name: deriveName(url), index: i + 1, total: targetUrls.length });
     });
 
-    // ── Lighthouse-only path (no Playwright browser) ───────────────────────
+    // ── Lighthouse-only path ───────────────────────────────────────────────
+    // Logs in first via Playwright (credentials from config.properties, or the
+    // UI override) so Lighthouse can audit the authenticated SPA page instead
+    // of being redirected to the signin screen.
     if (metricsType === 'lighthouse') {
+      const cookies = await captureSessionCookies(credentials, emit);
+
       const results: ResultEntry[] = [];
       for (let i = 0; i < targetUrls.length; i++) {
         const url  = targetUrls[i];
@@ -174,6 +182,7 @@ app.post('/api/analyze', async (req: Request, res: Response) => {
         emit({ t: 'log', lvl: 'info', msg: `[Lighthouse] Auditing: ${name}` });
         try {
           const lh = await LighthouseCollector.run(url, {
+            cookies,
             pageName:  name,
             outputDir: path.join('reports', 'lighthouse'),
           });
@@ -208,6 +217,57 @@ app.post('/api/analyze', async (req: Request, res: Response) => {
     if (!res.writableEnded) res.end();
   }
 });
+
+// ── Login + cookie capture for Lighthouse-only mode ───────────────────────────
+
+/**
+ * Launches a short-lived Playwright session, logs in using credentials from
+ * config.properties (or the UI override), waits for the post-login redirect,
+ * and returns the resulting session cookies for Lighthouse to consume.
+ *
+ * On any failure we log a warning and return [] so Lighthouse still runs —
+ * it'll just audit whatever the unauthenticated app shows (usually signin).
+ */
+async function captureSessionCookies(
+  override: { username: string; password: string } | undefined,
+  emit:     (data: object) => void,
+): Promise<LighthouseCookie[]> {
+  const config    = ConfigReader.getInstance();
+  const username  = override?.username || config.getUsername();
+  const password  = override?.password || config.getPassword();
+  const loginUrl  = config.getLoginUrl();
+  const timeoutMs = config.getPageLoadTimeout() * 1000;
+
+  emit({ t: 'log', lvl: 'info',
+    msg: `[Lighthouse] Pre-login: ${loginUrl} as '${username}' (creds from ${override?.username ? 'UI override' : 'config.properties'})` });
+
+  let session;
+  try {
+    session = await BrowserManager.launch();
+    const { page } = session;
+
+    await page.goto(loginUrl, { waitUntil: 'domcontentloaded', timeout: timeoutMs });
+    await new LoginPage(page, timeoutMs).login(username, password);
+    await page.waitForURL(
+      u => !u.href.includes('signin') && !u.href.includes('login') && !u.href.includes('security/'),
+      { timeout: timeoutMs },
+    ).catch(() => emit({ t: 'log', lvl: 'warn', msg: '[Lighthouse] Login redirect timed out — continuing with whatever cookies we have' }));
+
+    const raw = await page.context().cookies();
+    const cookies: LighthouseCookie[] = raw.map(c => ({
+      name:   c.name,
+      value:  c.value,
+      domain: c.domain,
+    }));
+    emit({ t: 'log', lvl: 'info', msg: `[Lighthouse] Captured ${cookies.length} session cookie(s)` });
+    return cookies;
+  } catch (e) {
+    emit({ t: 'log', lvl: 'warn', msg: `[Lighthouse] Login failed (${String(e)}) — running unauthenticated` });
+    return [];
+  } finally {
+    if (session) await BrowserManager.close(session).catch(() => {});
+  }
+}
 
 // ── Playwright spawn helper ────────────────────────────────────────────────────
 

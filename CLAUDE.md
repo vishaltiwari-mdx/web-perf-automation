@@ -13,10 +13,10 @@ The project has been converted to **TypeScript + Playwright**. The original Java
 1. **Open the signin page first:**
    `http://vishal.mdx.perforce.com:3000/#/security/signin`
 
-2. **Enter credentials:**
-   - Username: `admin`
-   - Password: `admin`
-   - (or values from `config.properties` / the Navigation Plan credential fields)
+2. **Enter credentials** (read from `config.properties` — currently `admin` / `mdx`):
+   - Username: `app.username` → `admin`
+   - Password: `app.password` → `mdx`
+   - The dashboard's per-run override fields take precedence only when BOTH are filled.
 
 3. **Wait for home page** — do not proceed until the URL leaves the signin path and the home page is confirmed ready.
 

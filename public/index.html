@@ -627,7 +627,7 @@
           <span class="metric-pill" data-metric-key="TCP">TCP (TCP Connection Time)</span>
           <span class="metric-pill" data-metric-key="DCL">DCL (DOM Content Loaded)</span>
           <span class="metric-pill" data-metric-key="AGG">AGG (AG-Grid Spinner Time)</span>
-          <span class="metric-pill" data-metric-key="API">API (Slow API Calls &gt; 1s)</span>
+          <span class="metric-pill" data-metric-key="API">API (Slow API Calls &gt; 300ms)</span>
         </div>
         <span id="metric-pills-hint" class="metric-pill__hint">Select <b>Custom</b> above to enable per-metric selection.</span>
       </div>
@@ -1033,7 +1033,11 @@ function onCredentialEdit() {
   if (!u || !p) return;
   const username = u.value.trim();
   const password = p.value;
-  credentialOverrides = (username || password) ? { username, password } : null;
+  // Only treat as an override when BOTH fields are filled. A lone username
+  // (often a browser-autofilled value) must not silently override the password
+  // from config.properties — that would cause login as the autofilled "admin"
+  // with whatever stale password the browser cached.
+  credentialOverrides = (username && password) ? { username, password } : null;
   enableConfirmButton();
 }
 
@@ -1342,14 +1346,16 @@ function makeLoginStep(n) {
           <div class="cred-input-group">
             <span class="cred-input-label">Username</span>
             <input id="cred-username" class="cred-input" type="text"
-                   placeholder="from config.properties"
-                   oninput="onCredentialEdit()" autocomplete="username" />
+                   placeholder="from config.properties" value=""
+                   oninput="onCredentialEdit()" autocomplete="off"
+                   data-1p-ignore data-lpignore="true" data-form-type="other" />
           </div>
           <div class="cred-input-group">
             <span class="cred-input-label">Password</span>
             <input id="cred-password" class="cred-input" type="password"
-                   placeholder="from config.properties"
-                   oninput="onCredentialEdit()" autocomplete="current-password" />
+                   placeholder="from config.properties" value=""
+                   oninput="onCredentialEdit()" autocomplete="new-password"
+                   data-1p-ignore data-lpignore="true" data-form-type="other" />
           </div>
           <span class="cred-hint">Leave blank to use config.properties values</span>
         </div>

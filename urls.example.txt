@@ -1,0 +1,17 @@
+# URL list for the Web Performance Analyzer CLI
+# - One URL per line, OR comma-separated, OR a mix — all three work.
+# - Lines starting with '#' are comments and are ignored.
+# - Blank lines are ignored.
+#
+# Run with:
+#   npm run analyze -- ./urls.example.txt
+#   npm run analyze:file -- ./urls.example.txt
+#   ts-node src/agent/PageLoadAnalyzerRunner.ts --file ./urls.example.txt
+
+# ── Example 1: one URL per line ───────────────────────────────────────────────
+http://vishal.mdx.perforce.com:3000/#/home
+http://vishal.mdx.perforce.com:3000/#/ip/catalog
+http://vishal.mdx.perforce.com:3000/#/library/catalog
+
+# ── Example 2: comma-separated on one line (also works) ───────────────────────
+# https://example.com, https://example.com/about, https://example.com/contact
